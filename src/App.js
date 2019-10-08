@@ -123,8 +123,8 @@ class App extends Component {
             endTime: this.getCurrTime(),
         }).done((data) => {
             this.setState({
-                wpm: data[0].toFixed(1),
-                accuracy: data[1].toFixed(1),
+                wpm: data.wpm.toFixed(1),
+                accuracy: data.accuracy.toFixed(1),
                 currTime: this.getCurrTime(),
             });
         });
