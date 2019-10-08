@@ -43,6 +43,9 @@ class App extends Component {
             fastestWords: "",
             showUsernameEntry: false,
             memes: false,
+            pToken: "",
+            sToken: "",
+            wpmToken: "",
         };
         this.timer = null;
         this.multiplayerTimer = null;
@@ -84,9 +87,12 @@ class App extends Component {
         });
 
         $.post("/request_paragraph").done((data) => {
+            this.setState({
+                pToken: data.pToken,
+            });
             if (this.state.pigLatin) {
                 $.post("/translate_to_pig_latin", {
-                    text: data,
+                    text: data.paragraph,
                 }, (translated) => {
                     this.setState({
                         promptedWords: translated.split(" "),
@@ -94,7 +100,7 @@ class App extends Component {
                 });
             } else {
                 this.setState({
-                    promptedWords: data.split(" "),
+                    promptedWords: data.paragraph.split(" "),
                 });
             }
         });
@@ -121,12 +127,25 @@ class App extends Component {
             typedText,
             startTime: this.state.startTime,
             endTime: this.getCurrTime(),
+            pToken: this.state.pToken,
+            sToken: this.state.sToken,
         }).done((data) => {
             this.setState({
                 wpm: data.wpm.toFixed(1),
                 accuracy: data.accuracy.toFixed(1),
                 currTime: this.getCurrTime(),
             });
+            if (data.hasOwnProperty("sToken")) {
+                this.setState({
+                    pToken: "",
+                    sToken: data.sToken
+                });
+            } else if (data.hasOwnProperty("wpmToken")) {
+                this.setState({
+                    sToken: "",
+                    wpmToken: data.wpmToken,
+                });
+            }
         });
     };
 
@@ -287,9 +306,10 @@ class App extends Component {
         $.post("/record_wpm", {
             username,
             wpm: this.state.wpm,
-            confirm: "If you want to mess around, send requests"
-                + " to /record_meme! Leave this endpoint for legit submissions please. Don't be a"
-                + " jerk and ruin this for everyone, thanks!",
+            wpmToken: this.state.wpmToken,
+        });
+        this.setState({
+            wpmToken: "",
         });
         this.hideUsernameEntry();
     };

@@ -73,14 +73,50 @@ def index():
     return send_from_directory("static", "index.html")
 
 
-passthrough("/request_paragraph")(gui.request_paragraph)
-passthrough("/analyze")(gui.compute_accuracy)
 passthrough("/autocorrect")(gui.autocorrect)
 passthrough("/fastest_words")(lambda x: gui.fastest_words(x, lambda targets: [State.progress[target] for target in targets["targets[]"]]))
 
 
 def get_id():
     return randrange(1000000000)
+
+
+@app.route("/request_paragraph", methods=["POST"])
+def request_paragraph():
+    paragraph = gui.request_paragraph(parse_qs(request.get_data().decode("ascii")));
+    p_token = "Paragraph Token"
+    return jsonify(
+        {
+            "paragraph": paragraph,
+            "pToken": p_token,
+        }
+    )
+
+
+def verify_paragraph_token(token, paragarph):
+    return token == "Paragraph Token"
+
+
+def verify_start_token(token, paragraph, start_time):
+    return token == "Start Token"
+
+
+@app.route("/analyze", methods=["POST"])
+def analyze():
+    analysis = gui.compute_accuracy(parse_qs(request.get_data().decode("ascii")))
+    paragraph = request.form.get("promptedText")
+    typed = request.form.get("typedText")
+    if request.form.get("pToken"):
+        p_token = request.form.get("pToken")
+        if verify_paragraph_token(p_token, paragraph):
+            analysis["sToken"] = "Start Token"
+    elif request.form.get("sToken") and paragraph == typed:
+        s_token = request.form.get("sToken")
+        start_time = request.form.get("startTime")
+        wpm = analysis["wpm"]
+        if verify_start_token(s_token, paragraph, start_time):
+            analysis["wpmToken"] = "WPM Token"
+    return jsonify(analysis)
 
 
 @app.route("/request_id", methods=["POST"])
@@ -195,17 +231,23 @@ def request_all_progress():
     return jsonify(out)
 
 
+def verify_wpm_token(token, wpm):
+    return token == "WPM Token"
+
+
 @app.route("/record_wpm", methods=["POST"])
 def record_name():
     username = request.form.get("username")
     wpm = float(request.form.get("wpm"))
-    confirm_string = request.form.get("confirm")
+    wpm_token = request.form.get("wpmToken")
 
-    if len(username) > 30 or wpm > 200 or confirm_string != "If you want to mess around, send requests to /record_meme! Leave this endpoint for legit submissions please. Don't be a jerk and ruin this for everyone, thanks!":
-        return record_meme()
-
-    with engine.connect() as conn:
-        conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
+    if verify_wpm_token(wpm_token, wpm) and len(username) <= 30 and wpm <= 200:
+        with engine.connect() as conn:
+            conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
+    else:
+        return jsonify({
+            "response": "Invalid username, WPM, or WPM token",
+        }), 400
     return ""
 
 
