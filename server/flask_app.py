@@ -8,6 +8,9 @@ from urllib.parse import parse_qs
 
 from flask import Flask, jsonify, request, send_from_directory
 from sqlalchemy import create_engine, text
+from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
 
 import gui
 import typing_test
@@ -18,6 +21,10 @@ MIN_PLAYERS = 2
 MAX_PLAYERS = 4
 QUEUE_TIMEOUT = timedelta(seconds=1)
 MAX_WAIT = timedelta(seconds=5)
+
+P_TOKEN_VALIDITY = 3600
+S_TOKEN_VALIDITY = 3600
+WPM_TOKEN_VALIDITY = 3600
 
 
 if __name__ == "__main__":
@@ -43,6 +50,15 @@ with engine.connect() as conn:
 );"""
     )
     conn.execute(statement)
+
+
+p_fernet = Fernet(Fernet.generate_key())
+s_fernet = Fernet(Fernet.generate_key())
+wpm_fernet = Fernet(Fernet.generate_key())
+
+p_tokens_used = {}
+s_tokens_used = {}
+wpm_tokens_used = {}
 
 
 @dataclass
@@ -77,8 +93,10 @@ passthrough("/autocorrect")(gui.autocorrect)
 passthrough("/fastest_words")(lambda x: gui.fastest_words(x, lambda targets: [State.progress[target] for target in targets["targets[]"]]))
 
 
-def get_id():
-    return randrange(1000000000)
+def hash_message(message):
+    sha256 = hashes.Hash(hashes.SHA256(), backend=default_backend())
+    sha256.update(message)
+    return sha256.finalize()
 
 
 @app.route("/request_paragraph", methods=["POST"])
