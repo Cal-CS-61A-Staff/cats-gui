@@ -168,8 +168,8 @@ def analyze():
     elif request.form.get("sToken") and paragraph == typed:
         s_token = request.form.get("sToken").encode("utf-8")
         wpm = analysis["wpm"]
-        if verify_start_token(s_token, paragraph, float(request.form.get("startTime")), float(request.form.get("endTime"))):
-            analysis["wpmToken"] = "WPM Token"
+        if verify_start_token(s_token, paragraph, float(request.form.get("startTime")), float(request.form.get("endTime"))) and wpm <= 200:
+            analysis["wpmToken"] = wpm_fernet.encrypt(str(wpm).encode("utf-8")).decode("utf-8")
 
     return jsonify(analysis)
 
@@ -291,16 +291,26 @@ def request_all_progress():
 
 
 def verify_wpm_token(token, wpm):
-    return token == "WPM Token"
+    contents = float(wpm_fernet.decrypt(token).decode('utf-8'))
+    if not verify_token(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY):
+        print("not valid")
+        return False
+    if round(contents, 1) != round(wpm, 1):
+        print("wrong contents")
+        print(round(contents, 1))
+        print(round(wpm, 1))
+        return False
+    mark_token_used(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY)
+    return True
 
 
 @app.route("/record_wpm", methods=["POST"])
 def record_name():
     username = request.form.get("username")
     wpm = float(request.form.get("wpm"))
-    wpm_token = request.form.get("wpmToken")
+    wpm_token = request.form.get("wpmToken").encode("utf-8")
 
-    if verify_wpm_token(wpm_token, wpm) and len(username) <= 30 and wpm <= 200:
+    if verify_wpm_token(wpm_token, wpm) and len(username) <= 30:
         with engine.connect() as conn:
             conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
     else:
