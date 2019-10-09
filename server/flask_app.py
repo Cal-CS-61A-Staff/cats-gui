@@ -25,6 +25,7 @@ MAX_WAIT = timedelta(seconds=5)
 P_TOKEN_VALIDITY = 3600
 S_TOKEN_VALIDITY = 3600
 WPM_TOKEN_VALIDITY = 3600
+TIMESTAMP_THRESHOLD = 60
 
 
 if __name__ == "__main__":
@@ -139,8 +140,19 @@ def verify_paragraph_token(token, paragraph):
     return True
 
 
-def verify_start_token(token, paragraph, start_time):
-    return token == "Start Token"
+def verify_start_token(token, paragraph, start_time, end_time):
+    contents = s_fernet.decrypt(token)
+    timestamp = s_fernet.extract_timestamp(token)
+    if not verify_token(token, s_fernet, s_tokens_used, S_TOKEN_VALIDITY):
+        return False
+    if contents != hash_message(paragraph.encode("utf-8")):
+        return False
+    if abs(timestamp - start_time) > TIMESTAMP_THRESHOLD:
+        return False
+    if abs(time.time() - end_time) > TIMESTAMP_THRESHOLD:
+        return False
+    mark_token_used(token, s_fernet, s_tokens_used, S_TOKEN_VALIDITY)
+    return True
 
 
 @app.route("/analyze", methods=["POST"])
@@ -148,16 +160,17 @@ def analyze():
     analysis = gui.compute_accuracy(parse_qs(request.get_data().decode("ascii")))
     paragraph = request.form.get("promptedText")
     typed = request.form.get("typedText")
+
     if request.form.get("pToken"):
         p_token = request.form.get("pToken").encode("utf-8")
         if verify_paragraph_token(p_token, paragraph):
-            analysis["sToken"] = "Start Token"
+            analysis["sToken"] = s_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
     elif request.form.get("sToken") and paragraph == typed:
-        s_token = request.form.get("sToken")
-        start_time = request.form.get("startTime")
+        s_token = request.form.get("sToken").encode("utf-8")
         wpm = analysis["wpm"]
-        if verify_start_token(s_token, paragraph, start_time):
+        if verify_start_token(s_token, paragraph, float(request.form.get("startTime")), float(request.form.get("endTime"))):
             analysis["wpmToken"] = "WPM Token"
+
     return jsonify(analysis)
 
 
