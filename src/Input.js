@@ -67,7 +67,7 @@ class InputField extends Component {
         if (e.target.innerText !== "") {
             return;
         }
-        this.setText(`${this.props.popPrevWord()} `, false);
+        this.setText(this.props.popPrevWord(), false);
         e.preventDefault();
         this.handleInput(e);
     };
