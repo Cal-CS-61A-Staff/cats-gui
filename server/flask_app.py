@@ -37,17 +37,15 @@ else:
 with engine.connect() as conn:
     statement = text(
         """CREATE TABLE IF NOT EXISTS leaderboard (
-    username varchar(128),
-    wpm integer,
-    PRIMARY KEY (`username`)
+    username varchar(32),
+    wpm integer
 );"""
     )
     conn.execute(statement)
     statement = text(
         """CREATE TABLE IF NOT EXISTS memeboard (
-    username varchar(128),
-    wpm integer,
-    PRIMARY KEY (`username`)
+    username varchar(1024),
+    wpm integer
 );"""
     )
     conn.execute(statement)
@@ -327,13 +325,15 @@ def record_name():
     wpm = float(request.form.get("wpm"))
     wpm_token = request.form.get("wpmToken").encode("utf-8")
 
-    if verify_wpm_token(wpm_token, wpm) and len(username) <= 30:
+    if verify_wpm_token(wpm_token, wpm) and len(username) <= 32:
         with engine.connect() as conn:
             conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
     else:
-        return jsonify({
-            "response": "Invalid username, WPM, or WPM token",
-        }), 400
+        return jsonify(
+            {
+                "response": "Invalid username, WPM, or WPM token",
+            }
+        ), 400
     return ""
 
 
@@ -342,8 +342,14 @@ def record_meme():
     username = request.form.get("username")
     wpm = float(request.form.get("wpm"))
 
-    with engine.connect() as conn:
-        conn.execute("INSERT INTO memeboard (username, wpm) VALUES (%s, %s)", [username, wpm])
+    if len(username) <= 1024:
+        with engine.connect() as conn:
+            conn.execute("INSERT INTO memeboard (username, wpm) VALUES (%s, %s)", [username, wpm])
+    else:
+        return jsonify({
+            "response": "Make it shorter!",
+            }
+        ), 400
     return ""
 
 

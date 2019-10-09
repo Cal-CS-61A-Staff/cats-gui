@@ -30,6 +30,7 @@ export default function NamePrompt({ show, onHide, onSubmit }) {
                             id="exampleInputEmail1"
                             aria-describedby="emailHelp"
                             placeholder="Enter username"
+                            maxlength="32"
                         />
                         <small id="emailHelp" className="form-text text-muted">
                     Please don't name yourself anything inappropriate!
