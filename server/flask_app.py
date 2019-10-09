@@ -101,8 +101,8 @@ def hash_message(message):
 
 @app.route("/request_paragraph", methods=["POST"])
 def request_paragraph():
-    paragraph = gui.request_paragraph(parse_qs(request.get_data().decode("ascii")));
-    p_token = "Paragraph Token"
+    paragraph = gui.request_paragraph(parse_qs(request.get_data().decode("ascii")))
+    p_token = p_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
     return jsonify(
         {
             "paragraph": paragraph,
@@ -111,8 +111,32 @@ def request_paragraph():
     )
 
 
-def verify_paragraph_token(token, paragarph):
-    return token == "Paragraph Token"
+def verify_token(token, fernet, used_tokens, validity):
+    timestamp = fernet.extract_timestamp(token)
+    if token in used_tokens:
+        return False
+    if time.time() - timestamp > validity:
+        return False
+    return True
+
+
+def mark_token_used(token, fernet, used_tokens, validity):
+    for used_token, used_timestamp in list(used_tokens.items()):
+        if used_timestamp - time.time() > validity:
+            used_tokens.pop(used_token)
+
+    timestamp = fernet.extract_timestamp(token)
+    used_tokens[token] = timestamp
+
+
+def verify_paragraph_token(token, paragraph):
+    contents = p_fernet.decrypt(token)
+    if not verify_token(token, p_fernet, p_tokens_used, P_TOKEN_VALIDITY):
+        return False
+    if contents != hash_message(paragraph.encode("utf-8")):
+        return False
+    mark_token_used(token, p_fernet, p_tokens_used, P_TOKEN_VALIDITY)
+    return True
 
 
 def verify_start_token(token, paragraph, start_time):
@@ -125,7 +149,7 @@ def analyze():
     paragraph = request.form.get("promptedText")
     typed = request.form.get("typedText")
     if request.form.get("pToken"):
-        p_token = request.form.get("pToken")
+        p_token = request.form.get("pToken").encode("utf-8")
         if verify_paragraph_token(p_token, paragraph):
             analysis["sToken"] = "Start Token"
     elif request.form.get("sToken") and paragraph == typed:
@@ -135,6 +159,10 @@ def analyze():
         if verify_start_token(s_token, paragraph, start_time):
             analysis["wpmToken"] = "WPM Token"
     return jsonify(analysis)
+
+
+def get_id():
+    return randrange(1000000000)
 
 
 @app.route("/request_id", methods=["POST"])
