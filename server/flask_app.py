@@ -100,10 +100,14 @@ def hash_message(message):
     return sha256.finalize()
 
 
+def generate_p_token(paragraph):
+    return p_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+
+
 @app.route("/request_paragraph", methods=["POST"])
 def request_paragraph():
     paragraph = gui.request_paragraph(parse_qs(request.get_data().decode("ascii")))
-    p_token = p_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+    p_token = generate_p_token(paragraph)
     return jsonify(
         {
             "paragraph": paragraph,
@@ -193,6 +197,7 @@ def request_match():
             {
                 "start": True,
                 "text": State.game_data[game_id]["text"],
+                "pToken": generate_p_token(State.game_data[game_id]["text"]),
                 "players": State.game_data[game_id]["players"],
             }
         )
@@ -230,9 +235,21 @@ def request_match():
 
         State.queue = {}
 
-        return jsonify({"start": True, "text": curr_text, "players": list(queue.keys())})
+        return jsonify(
+            {
+                "start": True,
+                "text": curr_text,
+                "pToken": generate_p_token(curr_text),
+                "players": list(queue.keys()),
+            }
+        )
     else:
-        return jsonify({"start": False, "numWaiting": len(State.queue)})
+        return jsonify(
+            {
+                "start": False,
+                "numWaiting": len(State.queue),
+            }
+        )
 
 
 @app.route("/report_progress", methods=["POST"])

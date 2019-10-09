@@ -286,6 +286,7 @@ class App extends Component {
                     progress: new Array(data.players.length).fill([0, 0]),
                     pigLatin: false,
                     autoCorrect: false,
+                    pToken: data.pToken,
                 });
                 clearInterval(this.multiplayerTimer);
                 this.multiplayerTimer = setInterval(this.requestProgress, 500);
