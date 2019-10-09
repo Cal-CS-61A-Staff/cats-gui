@@ -89,6 +89,8 @@ class App extends Component {
         $.post("/request_paragraph").done((data) => {
             this.setState({
                 pToken: data.pToken,
+                sToken: "",
+                wpmToken: "",
             });
             if (this.state.pigLatin) {
                 $.post("/translate_to_pig_latin", {
