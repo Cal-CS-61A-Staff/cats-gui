@@ -68,6 +68,7 @@ class InputField extends Component {
             return;
         }
         this.setText(`${this.props.popPrevWord()} `, false);
+        e.preventDefault();
     };
 
     handleInput = (e) => {
