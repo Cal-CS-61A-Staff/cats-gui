@@ -1,4 +1,5 @@
 import os
+import random
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -15,6 +16,8 @@ from cryptography.hazmat.primitives import hashes
 import gui
 import typing_test
 
+from gui import WORDS_LIST
+
 app = Flask(__name__, static_url_path="", static_folder="static")
 
 MIN_PLAYERS = 2
@@ -26,6 +29,9 @@ P_TOKEN_VALIDITY = 3600
 S_TOKEN_VALIDITY = 3600
 WPM_TOKEN_VALIDITY = 3600
 TIMESTAMP_THRESHOLD = 60
+
+CAPTCHA_NUM_WORDS = 20
+CAPTCHA_WORDS_END_INDEX = 999
 
 
 if __name__ == "__main__":
@@ -366,6 +372,10 @@ def leaderboard():
 def memeboard():
     with engine.connect() as conn:
         return jsonify(list(list(x) for x in conn.execute("SELECT username, wpm FROM memeboard ORDER BY wpm DESC LIMIT 20").fetchall()))
+
+
+def build_captcha_text():
+    return " ".join(random.sample(WORDS_LIST[:CAPTCHA_WORDS_END_INDEX], CAPTCHA_NUM_WORDS))
 
 
 if __name__ == "__main__":
