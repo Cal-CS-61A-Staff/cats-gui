@@ -346,8 +346,9 @@ def record_meme():
         with engine.connect() as conn:
             conn.execute("INSERT INTO memeboard (username, wpm) VALUES (%s, %s)", [username, wpm])
     else:
-        return jsonify({
-            "response": "Make it shorter!",
+        return jsonify(
+            {
+                "response": "Make it shorter!",
             }
         ), 400
     return ""
