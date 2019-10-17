@@ -104,14 +104,9 @@ def generate_p_token(paragraph):
 
 @app.route("/request_paragraph", methods=["POST"])
 def request_paragraph():
-    paragraph = gui.request_paragraph(parse_qs(request.get_data().decode("ascii")))
-    p_token = generate_p_token(paragraph)
-    return jsonify(
-        {
-            "paragraph": paragraph,
-            "pToken": p_token,
-        }
-    )
+    response = gui.request_paragraph(parse_qs(request.get_data().decode("ascii")))
+    response["pToken"] = generate_p_token(response["paragraph"])
+    return jsonify(response)
 
 
 def verify_token(token, fernet, used_tokens, validity):

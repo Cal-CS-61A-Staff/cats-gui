@@ -83,7 +83,9 @@ def request_paragraph(data):
     """Return a random paragraph."""
     paragraphs = typing_test.lines_from_file(PARAGRAPH_PATH)
     paragraph_index = randrange(len(paragraphs))
-    return typing_test.choose(paragraphs, lambda x: True, paragraph_index)
+    return {
+        "paragraph": typing_test.choose(paragraphs, lambda x: True, paragraph_index),
+    }
 
 
 @route("/analyze")
