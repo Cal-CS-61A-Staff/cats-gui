@@ -65,13 +65,12 @@ with engine.connect() as conn:
 p_fernet = Fernet(Fernet.generate_key())
 s_fernet = Fernet(Fernet.generate_key())
 wpm_fernet = Fernet(Fernet.generate_key())
+captcha_fernet = Fernet(Fernet.generate_key())
 
 p_tokens_used = {}
 s_tokens_used = {}
 wpm_tokens_used = {}
-
-
-captcha_fernet = Fernet(Fernet.generate_key())
+captcha_tokens_used = {}
 
 
 @dataclass
@@ -395,8 +394,9 @@ def get_captcha():
     for word in captcha_text.split(" "):
         with io.BytesIO() as out:
             claptcha = Claptcha(word, "FreeMono.ttf", margin=(20, 10))
-            image_b64 = base64.b64encode(claptcha.bytes[1].getvalue()).decode('utf-8')
+            image_b64 = base64.b64encode(claptcha.bytes[1].getvalue()).decode("utf-8")
             response["captchaUris"].append("data:image/png;base64," + image_b64)
+    response["captchaToken"] = captcha_fernet.encrypt(captcha_text.encode("utf-8")).decode("utf-8")
     return jsonify(response)
 
 
