@@ -4,11 +4,6 @@ import Modal from "react-bootstrap/Modal";
 export default function NamePrompt(props) {
     const inputRef = useRef(null);
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        props.onSubmit(inputRef.current.value);
-    }
-
     return (
         <Modal
             size="md"
@@ -26,7 +21,7 @@ export default function NamePrompt(props) {
             <Modal.Body>
                 Congratulations! Your WPM is fast enough to place on our leaderboard! Enter a name here to associate it with your score:
                 <br />
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={(e) => { e.preventDefault(); props.onSubmit(inputRef.current.value); }}>
                     <div className="form-group">
                         <input
                             type="text"

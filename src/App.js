@@ -47,6 +47,7 @@ class App extends Component {
             pToken: "",
             sToken: "",
             wpmToken: "",
+            username: "",
             captchaRequired: false,
             captchaUris: [],
             captchaToken: "",
@@ -283,7 +284,6 @@ class App extends Component {
         if (mode === Mode.WAITING) {
             this.multiplayerTimer = setInterval(this.requestMatch, 1000);
         }
-        this.requestCaptcha();
     };
 
     requestMatch = () => {
@@ -317,16 +317,29 @@ class App extends Component {
     };
 
     handleUsernameSubmission = (username) => {
+        this.setState({
+            username: username,
+        }, () => {
+            if (this.state.captchaRequired) {
+                this.requestCaptcha();
+            } else {
+                this.submitUsername();
+            }
+        });
+        this.hideUsernameEntry();
+    };
+
+    submitUsername = () => {
         $.post("/record_wpm", {
-            username,
+            username: this.state.username,
             wpm: this.state.wpm,
             wpmToken: this.state.wpmToken,
         });
         this.setState({
+            username: "",
             wpmToken: "",
         });
-        this.hideUsernameEntry();
-    };
+    }
 
     hideUsernameEntry = () => {
         this.setState({ showUsernameEntry: false });
@@ -336,13 +349,10 @@ class App extends Component {
         $.get("/get_captcha").done((data) => {
             this.setState({
                 captchaUris: data.captchaUris,
-                captchaToken: data.cpatchaToken,
+                captchaToken: data.captchaToken,
+                showCaptcha: true,
             });
         });
-    }
-
-    showCaptcha = () => {
-        this.setState({ showCaptcha: true });
     }
 
     handleSubmitCaptcha = (typed) => {
