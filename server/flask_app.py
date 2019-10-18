@@ -1,6 +1,10 @@
+import base64
+import io
 import os
 import random
 import time
+
+from claptcha import Claptcha
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -30,8 +34,9 @@ S_TOKEN_VALIDITY = 3600
 WPM_TOKEN_VALIDITY = 3600
 TIMESTAMP_THRESHOLD = 60
 
-CAPTCHA_NUM_WORDS = 20
-CAPTCHA_WORDS_END_INDEX = 999
+CAPTCHA_WORD_LENGTH_RANGE = (4, 6)
+CAPTCHA_LAST_POSSIBLE_INDEX = 999
+CAPTCHA_NUM_WORDS = 40
 
 
 if __name__ == "__main__":
@@ -64,6 +69,9 @@ wpm_fernet = Fernet(Fernet.generate_key())
 p_tokens_used = {}
 s_tokens_used = {}
 wpm_tokens_used = {}
+
+
+captcha_fernet = Fernet(Fernet.generate_key())
 
 
 @dataclass
@@ -375,7 +383,21 @@ def memeboard():
 
 
 def build_captcha_text():
-    return " ".join(random.sample(WORDS_LIST[:CAPTCHA_WORDS_END_INDEX], CAPTCHA_NUM_WORDS))
+    possible_words = WORDS_LIST[:CAPTCHA_LAST_POSSIBLE_INDEX]
+    possible_words = [word for word in possible_words if CAPTCHA_WORD_LENGTH_RANGE[0] <= len(word) <= CAPTCHA_WORD_LENGTH_RANGE[1]]
+    return " ".join(random.sample(possible_words, CAPTCHA_NUM_WORDS))
+
+
+@app.route("/get_captcha", methods=["GET"])
+def get_captcha():
+    captcha_text = build_captcha_text()
+    response = { "captchaUris": [] }
+    for word in captcha_text.split(" "):
+        with io.BytesIO() as out:
+            claptcha = Claptcha(word, "FreeMono.ttf", margin=(20, 10))
+            image_b64 = base64.b64encode(claptcha.bytes[1].getvalue()).decode('utf-8')
+            response["captchaUris"].append("data:image/png;base64," + image_b64)
+    return jsonify(response)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.min.js";
 import $ from "jquery";
 import Button from "react-bootstrap/Button.js";
+import CaptchaDialog from "./CaptchaDialog.js";
 import Input from "./Input.js";
 import Indicators from "./Indicators.js";
 import Leaderboard from "./Leaderboard.js";
@@ -46,6 +47,9 @@ class App extends Component {
             pToken: "",
             sToken: "",
             wpmToken: "",
+            captchaUris: [],
+            captchaToken: "",
+            showCaptcha: false,
         };
         this.timer = null;
         this.multiplayerTimer = null;
@@ -321,6 +325,24 @@ class App extends Component {
         this.setState({ showUsernameEntry: false });
     };
 
+    requestCaptcha = () => {
+        $.get("/get_captcha").done((data) => {
+            this.setState({
+                captchaUris: data.captchaUris,
+                captchaToken: data.cpatchaToken,
+            });
+            this.showCaptcha();
+        });
+    }
+
+    showCaptcha = () => {
+        this.setState({ showCaptcha: true });
+    }
+
+    handleSubmitCaptcha = (typed) => {
+        // TODO Implement
+    }
+
     render() {
         const {
             wpm, accuracy, numPlayers, startTime, currTime, playerList, id, fastestWords,
@@ -410,6 +432,11 @@ class App extends Component {
                     show={this.state.showUsernameEntry}
                     onHide={this.hideUsernameEntry}
                     onSubmit={this.handleUsernameSubmission}
+                />
+                <CaptchaDialog
+                    show={this.state.showCaptcha}
+                    captchaUris={this.state.captchaUris}
+                    handleSubmitCaptcha={this.handleSubmitCaptcha}
                 />
             </>
         );
