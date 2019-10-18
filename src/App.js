@@ -323,17 +323,19 @@ class App extends Component {
             if (this.state.captchaRequired) {
                 this.requestCaptcha();
             } else {
-                this.submitUsername();
+                this.submitUsername("");
             }
         });
         this.hideUsernameEntry();
     };
 
-    submitUsername = () => {
+    submitUsername = (typedCaptcha) => {
         $.post("/record_wpm", {
             username: this.state.username,
             wpm: this.state.wpm,
             wpmToken: this.state.wpmToken,
+            captchaToken: this.state.captchaToken,
+            typedCaptcha: typedCaptcha,
         });
         this.setState({
             username: "",
@@ -355,8 +357,13 @@ class App extends Component {
         });
     }
 
-    handleSubmitCaptcha = (typed) => {
-        // TODO Implement
+    handleSubmitCaptcha = (typedCaptcha) => {
+        this.submitUsername(typedCaptcha);
+        this.setState({
+            captchaUris: [],
+            captchaToken: "",
+            showCaptcha: false,
+        });
     }
 
     render() {
