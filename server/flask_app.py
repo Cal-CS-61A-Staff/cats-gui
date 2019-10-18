@@ -427,7 +427,7 @@ def analyze_captcha(captcha_token, typed_captcha):
     captcha = captcha_fernet.decrypt(captcha_token).decode("utf-8")
     captcha_wpm = typing_test.wpm(typed_captcha, time.time() - captcha_fernet.extract_timestamp(captcha_token))
     captcha_accuracy = typing_test.accuracy(typed_captcha, captcha) * len(typed_captcha.split(" ")) / CAPTCHA_NUM_WORDS
-    return (captcha_wpm, captcha_accuracy)
+    return captcha_wpm, captcha_accuracy
 
 
 @app.route("/submit_captcha", methods=["POST"])
