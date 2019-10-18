@@ -171,6 +171,13 @@ def verify_start_token(token, paragraph, start_time, end_time):
     return True
 
 
+def retreive_verified_wpm(token):
+    if verify_token(token, verify_fernet, {}, VERIFY_PERIOD):
+        return float(verify_fernet.decrypt(token).decode("utf-8"))
+    else:
+        return 0.0
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
     analysis = gui.compute_accuracy(parse_qs(request.get_data().decode("ascii")))
@@ -184,9 +191,10 @@ def analyze():
     elif request.form.get("sToken") and paragraph == typed:
         s_token = request.form.get("sToken").encode("utf-8")
         wpm = analysis["wpm"]
+        verified_wpm = 0.0 if not request.cookies.get("verified_wpm") else retreive_verified_wpm(request.cookies.get("verified_wpm").encode("utf-8"))
         if verify_start_token(s_token, paragraph, float(request.form.get("startTime")), float(request.form.get("endTime"))) and wpm <= 200:
             analysis["wpmToken"] = wpm_fernet.encrypt(str(wpm).encode("utf-8")).decode("utf-8")
-            analysis["captchaRequired"] = wpm >= CAPTCHA_WPM_THRESHOLD
+            analysis["captchaRequired"] = wpm >= CAPTCHA_WPM_THRESHOLD and wpm > verified_wpm
 
     return jsonify(analysis)
 
