@@ -381,6 +381,13 @@ class App extends Component {
                     captchaSubmitted: true,
                     captchaPassed: false,
                 });
+                setTimeout(() => {
+                    this.requestCaptcha();
+                    this.setState({
+                        captchaSubmitted: false,
+                        captchaPassed: false,
+                    });
+                }, 1000);
             }
         });
         this.setState({
