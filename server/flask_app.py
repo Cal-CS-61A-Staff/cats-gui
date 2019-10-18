@@ -358,7 +358,7 @@ def record_name():
             {
                 "response": "Username too long",
             }
-        )
+        ), 400
     if wpm >= CAPTCHA_WPM_THRESHOLD and wpm > verified_wpm:
         return jsonify(
             {
