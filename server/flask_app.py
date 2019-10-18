@@ -364,7 +364,7 @@ def record_name():
             {
                 "response": "CAPTCHA verification failed",
             }
-        )
+        ), 400
     with engine.connect() as conn:
         conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
     return ""
