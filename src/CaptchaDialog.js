@@ -18,9 +18,9 @@ export default function CaptchaDialog(props) {
                 <Modal.Title>CAPTCHA</Modal.Title>
             </Modal.Header>
 
-            <Modal.Body>
+            <Modal.Body className="CaptchaDialog">
                 <CaptchaImage captchaUris={props.captchaUris} />
-                <input ref={captchaRef}/>
+                <textarea ref={captchaRef}></textarea>
             </Modal.Body>
             
             <Modal.Footer>
