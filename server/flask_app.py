@@ -303,12 +303,8 @@ def request_all_progress():
 def verify_wpm_token(token, wpm):
     contents = float(wpm_fernet.decrypt(token).decode('utf-8'))
     if not verify_token(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY):
-        print("not valid")
         return False
     if round(contents, 1) != round(wpm, 1):
-        print("wrong contents")
-        print(round(contents, 1))
-        print(round(wpm, 1))
         return False
     mark_token_used(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY)
     return True
@@ -319,16 +315,20 @@ def record_name():
     username = request.form.get("username")
     wpm = float(request.form.get("wpm"))
     wpm_token = request.form.get("wpmToken").encode("utf-8")
-
-    if verify_wpm_token(wpm_token, wpm) and len(username) <= 32:
-        with engine.connect() as conn:
-            conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
-    else:
+    if not verify_wpm_token(wpm_token, wpm):
         return jsonify(
             {
-                "response": "Invalid username, WPM, or WPM token",
+                "response": "Invalid WPM or WPM token",
             }
         ), 400
+    if len(username) > 32:
+        return jsonify(
+            {
+                "response": "Username too long",
+            }
+        )
+    with engine.connect() as conn:
+        conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
     return ""
 
 
@@ -336,16 +336,14 @@ def record_name():
 def record_meme():
     username = request.form.get("username")
     wpm = float(request.form.get("wpm"))
-
-    if len(username) <= 1024:
-        with engine.connect() as conn:
-            conn.execute("INSERT INTO memeboard (username, wpm) VALUES (%s, %s)", [username, wpm])
-    else:
+    if len(username) > 1024:
         return jsonify(
             {
                 "response": "Make it shorter!",
             }
         ), 400
+    with engine.connect() as conn:
+        conn.execute("INSERT INTO memeboard (username, wpm) VALUES (%s, %s)", [username, wpm])
     return ""
 
 
