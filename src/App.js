@@ -329,13 +329,11 @@ class App extends Component {
         this.hideUsernameEntry();
     };
 
-    submitUsername = (typedCaptcha) => {
+    submitUsername = () => {
         $.post("/record_wpm", {
             username: this.state.username,
             wpm: this.state.wpm,
             wpmToken: this.state.wpmToken,
-            captchaToken: this.state.captchaToken,
-            typedCaptcha: typedCaptcha,
         });
         this.setState({
             username: "",
@@ -358,11 +356,22 @@ class App extends Component {
     }
 
     handleSubmitCaptcha = (typedCaptcha) => {
-        this.submitUsername(typedCaptcha);
+        $.post("/submit_captcha", {
+            captchaToken: this.state.captchaToken,
+            typedCaptcha: typedCaptcha,
+        }).done((data) => {
+            if (data.passed && data.verified >= this.state.wpm) {
+                this.submitUsername(typedCaptcha);
+                this.setState({
+                    showCaptcha: false,
+                });
+            } else {
+                // TODO Fail captcha
+            }
+        });
         this.setState({
             captchaUris: [],
             captchaToken: "",
-            showCaptcha: false,
         });
     }
 

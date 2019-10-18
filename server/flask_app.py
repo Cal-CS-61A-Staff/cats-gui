@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from random import randrange
 from urllib.parse import parse_qs
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, make_response, request, send_from_directory
 from sqlalchemy import create_engine, text
 from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
@@ -29,15 +29,19 @@ MAX_PLAYERS = 4
 QUEUE_TIMEOUT = timedelta(seconds=1)
 MAX_WAIT = timedelta(seconds=5)
 
-P_TOKEN_VALIDITY = 3600
-S_TOKEN_VALIDITY = 3600
-WPM_TOKEN_VALIDITY = 3600
-TIMESTAMP_THRESHOLD = 60
-
 CAPTCHA_WPM_THRESHOLD = 100
 CAPTCHA_WORD_LENGTH_RANGE = (4, 6)
 CAPTCHA_LAST_POSSIBLE_INDEX = 999
 CAPTCHA_NUM_WORDS = 40
+CAPTCHA_ACCURACY_THRESHOLD = 80.0
+CAPTCHA_VERIFIED_WPM_SCALE = 1.5
+VERIFY_PERIOD = 86400
+
+P_TOKEN_VALIDITY = 3600
+S_TOKEN_VALIDITY = 3600
+WPM_TOKEN_VALIDITY = 3600
+CAPTCHA_TOKEN_VALIDITY = CAPTCHA_NUM_WORDS / CAPTCHA_WPM_THRESHOLD * 60 * 2
+TIMESTAMP_THRESHOLD = 60
 
 
 if __name__ == "__main__":
@@ -67,6 +71,7 @@ p_fernet = Fernet(Fernet.generate_key())
 s_fernet = Fernet(Fernet.generate_key())
 wpm_fernet = Fernet(Fernet.generate_key())
 captcha_fernet = Fernet(Fernet.generate_key())
+verify_fernet = Fernet(Fernet.generate_key())
 
 p_tokens_used = {}
 s_tokens_used = {}
@@ -323,6 +328,44 @@ def verify_wpm_token(token, wpm):
         return False
     mark_token_used(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY)
     return True
+
+
+def analyze_captcha(captcha_token, typed_captcha):
+    if not verify_token(captcha_token, captcha_fernet, captcha_tokens_used, CAPTCHA_TOKEN_VALIDITY):
+        return False
+    mark_token_used(captcha_token, captcha_fernet, captcha_tokens_used, CAPTCHA_TOKEN_VALIDITY)
+    captcha = captcha_fernet.decrypt(captcha_token).decode("utf-8")
+    captcha_wpm = typing_test.wpm(typed_captcha, time.time() - captcha_fernet.extract_timestamp(captcha_token))
+    captcha_accuracy = typing_test.accuracy(typed_captcha, captcha) * len(typed_captcha.split(" ")) / CAPTCHA_NUM_WORDS
+    return (captcha_wpm, captcha_accuracy)
+
+
+@app.route("/submit_captcha", methods=["POST"])
+def submit_captcha():
+    captcha_token = request.form.get("captchaToken").encode("utf-8")
+    typed_captcha = request.form.get("typedCaptcha")
+    captcha_wpm, captcha_accuracy = analyze_captcha(captcha_token, typed_captcha)
+    if captcha_accuracy >= CAPTCHA_ACCURACY_THRESHOLD:
+        verified_wpm = captcha_wpm * CAPTCHA_VERIFIED_WPM_SCALE
+        verify_token = verify_fernet.encrypt(str(verified_wpm).encode("utf-8"))
+        response = make_response(jsonify(
+            {
+                "passed": True,
+                "wpm": captcha_wpm,
+                "accuracy": captcha_accuracy,
+                "verified": verified_wpm,
+            }
+        ))
+        response.set_cookie("verification", verify_token.decode("utf-8"), max_age=VERIFY_PERIOD, path="/record_wpm")
+        return response
+    else:
+        return jsonify(
+            {
+                "passed": False,
+                "wpm": captcha_wpm,
+                "accuracy": captcha_accuracy,
+            }
+        )
 
 
 @app.route("/record_wpm", methods=["POST"])
