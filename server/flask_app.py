@@ -40,7 +40,7 @@ VERIFY_PERIOD = 86400
 P_TOKEN_VALIDITY = 3600
 S_TOKEN_VALIDITY = 3600
 WPM_TOKEN_VALIDITY = 3600
-CAPTCHA_TOKEN_VALIDITY = CAPTCHA_NUM_WORDS / CAPTCHA_WPM_THRESHOLD * 60 * 2
+CAPTCHA_TOKEN_VALIDITY = 3600
 TIMESTAMP_THRESHOLD = 60
 
 
@@ -422,7 +422,7 @@ def get_captcha():
 
 def analyze_captcha(captcha_token, typed_captcha):
     if not verify_token(captcha_token, captcha_fernet, captcha_tokens_used, CAPTCHA_TOKEN_VALIDITY):
-        return False
+        return 0.0
     mark_token_used(captcha_token, captcha_fernet, captcha_tokens_used, CAPTCHA_TOKEN_VALIDITY)
     captcha = captcha_fernet.decrypt(captcha_token).decode("utf-8")
     captcha_wpm = typing_test.wpm(typed_captcha, time.time() - captcha_fernet.extract_timestamp(captcha_token))
