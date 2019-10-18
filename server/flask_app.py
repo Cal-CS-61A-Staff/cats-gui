@@ -420,7 +420,7 @@ def generate_captcha():
     captcha_uris = []
     for word in captcha_text.split(" "):
         with io.BytesIO() as out:
-            claptcha = Claptcha(word, "FreeMono.ttf", margin=(20, 10))
+            claptcha = Claptcha(word, "FreeMono.ttf", margin=(20, 10), noise=0.3)
             image_b64 = base64.b64encode(claptcha.bytes[1].getvalue()).decode("utf-8")
             captcha_uris.append("data:image/png;base64," + image_b64)
     return {
