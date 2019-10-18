@@ -8,7 +8,9 @@ from claptcha import Claptcha
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from queue import Queue
 from random import randrange
+from threading import Thread
 from urllib.parse import parse_qs
 
 from flask import Flask, jsonify, make_response, request, send_from_directory
@@ -29,6 +31,7 @@ MAX_PLAYERS = 4
 QUEUE_TIMEOUT = timedelta(seconds=1)
 MAX_WAIT = timedelta(seconds=5)
 
+CAPTCHA_QUEUE_LEN = 5
 CAPTCHA_WPM_THRESHOLD = 100
 CAPTCHA_WORD_LENGTH_RANGE = (4, 6)
 CAPTCHA_LAST_POSSIBLE_INDEX = 999
@@ -77,6 +80,8 @@ p_tokens_used = {}
 s_tokens_used = {}
 wpm_tokens_used = {}
 captcha_tokens_used = {}
+
+captcha_queue = Queue()
 
 
 @dataclass
@@ -424,9 +429,16 @@ def generate_captcha():
     }
 
 
+def populate_captcha_queue():
+    while captcha_queue.qsize() < CAPTCHA_QUEUE_LEN:
+        captcha_queue.put(generate_captcha())
+
+
 @app.route("/get_captcha", methods=["GET"])
 def get_captcha():
-    captcha = generate_captcha()
+    t = Thread(target=populate_captcha_queue)
+    t.start()
+    captcha = captcha_queue.get()
     return jsonify(
         {
             "captchaToken": captcha_fernet.encrypt(captcha["text"].encode("utf-8")).decode("utf-8"),
@@ -471,6 +483,10 @@ def submit_captcha():
                 "accuracy": captcha_accuracy,
             }
         )
+
+
+t = Thread(target=populate_captcha_queue)
+t.start()
 
 
 if __name__ == "__main__":
