@@ -52,6 +52,8 @@ class App extends Component {
             captchaUris: [],
             captchaToken: "",
             showCaptcha: false,
+            captchaSubmitted: false,
+            captchaPassed: false,
         };
         this.timer = null;
         this.multiplayerTimer = null;
@@ -363,14 +365,25 @@ class App extends Component {
             if (data.passed && data.verified >= this.state.wpm) {
                 this.submitUsername(typedCaptcha);
                 this.setState({
-                    showCaptcha: false,
+                    captchaSubmitted: true,
+                    captchaPassed: true,
                 });
+                setTimeout(() => {
+                    this.setState({
+                        captchaUris: [],
+                        showCaptcha: false,
+                        captchaSubmitted: false,
+                        captchaPassed: false,
+                    });
+                }, 1000);
             } else {
-                // TODO Fail captcha
+                this.setState({
+                    captchaSubmitted: true,
+                    captchaPassed: false,
+                });
             }
         });
         this.setState({
-            captchaUris: [],
             captchaToken: "",
         });
     }
@@ -469,6 +482,8 @@ class App extends Component {
                 <CaptchaDialog
                     show={this.state.showCaptcha}
                     captchaUris={this.state.captchaUris}
+                    submitted={this.state.captchaSubmitted}
+                    passed={this.state.captchaPassed}
                     handleSubmitCaptcha={this.handleSubmitCaptcha}
                 />
             </>

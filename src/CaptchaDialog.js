@@ -24,7 +24,11 @@ export default function CaptchaDialog(props) {
             </Modal.Body>
             
             <Modal.Footer>
-                <Button onClick={() => props.handleSubmitCaptcha(captchaRef.current.value)}>Submit</Button>
+                {
+                    !props.submitted ?
+                    <Button onClick={() => props.handleSubmitCaptcha(captchaRef.current.value)}>Submit</Button> :
+                    <Button disabled="true" variant={props.passed ? "success" : "danger"}>{props.passed ? "Passed" : "Failed"}</Button>
+                }
             </Modal.Footer>
         </Modal>
     );
