@@ -343,6 +343,7 @@ def record_name():
     username = request.form.get("username")
     wpm = float(request.form.get("wpm"))
     wpm_token = request.form.get("wpmToken").encode("utf-8")
+    verified_wpm = 0.0 if not request.cookies.get("verified_wpm") else retreive_verified_wpm(request.cookies.get("verified_wpm").encode("utf-8"))
     if not verify_wpm_token(wpm_token, wpm):
         return jsonify(
             {
@@ -353,6 +354,12 @@ def record_name():
         return jsonify(
             {
                 "response": "Username too long",
+            }
+        )
+    if wpm >= CAPTCHA_WPM_THRESHOLD and wpm > verified_wpm:
+        return jsonify(
+            {
+                "response": "CAPTCHA verification failed",
             }
         )
     with engine.connect() as conn:
