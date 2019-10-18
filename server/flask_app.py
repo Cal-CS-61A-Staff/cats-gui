@@ -34,6 +34,7 @@ S_TOKEN_VALIDITY = 3600
 WPM_TOKEN_VALIDITY = 3600
 TIMESTAMP_THRESHOLD = 60
 
+CAPTCHA_WPM_THRESHOLD = 100
 CAPTCHA_WORD_LENGTH_RANGE = (4, 6)
 CAPTCHA_LAST_POSSIBLE_INDEX = 999
 CAPTCHA_NUM_WORDS = 40
@@ -180,6 +181,7 @@ def analyze():
         wpm = analysis["wpm"]
         if verify_start_token(s_token, paragraph, float(request.form.get("startTime")), float(request.form.get("endTime"))) and wpm <= 200:
             analysis["wpmToken"] = wpm_fernet.encrypt(str(wpm).encode("utf-8")).decode("utf-8")
+            analysis["captchaRequired"] = wpm >= CAPTCHA_WPM_THRESHOLD
 
     return jsonify(analysis)
 

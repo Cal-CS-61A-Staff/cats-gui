@@ -47,6 +47,7 @@ class App extends Component {
             pToken: "",
             sToken: "",
             wpmToken: "",
+            captchaRequired: false,
             captchaUris: [],
             captchaToken: "",
             showCaptcha: false,
@@ -151,6 +152,11 @@ class App extends Component {
                     sToken: "",
                     wpmToken: data.wpmToken,
                 });
+                if (data.hasOwnProperty("captchaRequired")) {
+                    this.setState({
+                        captchaRequired: data.captchaRequired,
+                    });
+                }
             }
         });
     };
@@ -277,6 +283,7 @@ class App extends Component {
         if (mode === Mode.WAITING) {
             this.multiplayerTimer = setInterval(this.requestMatch, 1000);
         }
+        this.requestCaptcha();
     };
 
     requestMatch = () => {
@@ -331,7 +338,6 @@ class App extends Component {
                 captchaUris: data.captchaUris,
                 captchaToken: data.cpatchaToken,
             });
-            this.showCaptcha();
         });
     }
 
@@ -432,6 +438,7 @@ class App extends Component {
                     show={this.state.showUsernameEntry}
                     onHide={this.hideUsernameEntry}
                     onSubmit={this.handleUsernameSubmission}
+                    captchaRequired={this.state.captchaRequired}
                 />
                 <CaptchaDialog
                     show={this.state.showCaptcha}
