@@ -326,7 +326,7 @@ def record_name():
             {
                 "response": "Username too long",
             }
-        )
+        ), 400
     with engine.connect() as conn:
         conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
     return ""
