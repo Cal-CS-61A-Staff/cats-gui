@@ -129,7 +129,10 @@ def request_paragraph():
 
 
 def verify_token(token, fernet, used_tokens, validity):
-    timestamp = fernet.extract_timestamp(token)
+    try:
+        timestamp = fernet.extract_timestamp(token)
+    except:
+        return False
     if token in used_tokens:
         return False
     if time.time() - timestamp > validity:
@@ -147,9 +150,9 @@ def mark_token_used(token, fernet, used_tokens, validity):
 
 
 def verify_paragraph_token(token, paragraph):
-    contents = p_fernet.decrypt(token)
     if not verify_token(token, p_fernet, p_tokens_used, P_TOKEN_VALIDITY):
         return False
+    contents = p_fernet.decrypt(token)
     if contents != hash_message(paragraph.encode("utf-8")):
         return False
     mark_token_used(token, p_fernet, p_tokens_used, P_TOKEN_VALIDITY)
@@ -157,10 +160,10 @@ def verify_paragraph_token(token, paragraph):
 
 
 def verify_start_token(token, paragraph, start_time, end_time):
-    contents = s_fernet.decrypt(token)
-    timestamp = s_fernet.extract_timestamp(token)
     if not verify_token(token, s_fernet, s_tokens_used, S_TOKEN_VALIDITY):
         return False
+    contents = s_fernet.decrypt(token)
+    timestamp = s_fernet.extract_timestamp(token)
     if contents != hash_message(paragraph.encode("utf-8")):
         return False
     if abs(timestamp - start_time) > TIMESTAMP_THRESHOLD:
@@ -329,9 +332,9 @@ def request_all_progress():
 
 
 def verify_wpm_token(token, wpm):
-    contents = float(wpm_fernet.decrypt(token).decode('utf-8'))
     if not verify_token(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY):
         return False
+    contents = float(wpm_fernet.decrypt(token).decode('utf-8'))
     if round(contents, 1) != round(wpm, 1):
         return False
     mark_token_used(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY)
