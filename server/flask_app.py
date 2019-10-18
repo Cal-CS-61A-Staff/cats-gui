@@ -410,17 +410,29 @@ def build_captcha_text():
     return " ".join(random.sample(possible_words, CAPTCHA_NUM_WORDS))
 
 
-@app.route("/get_captcha", methods=["GET"])
-def get_captcha():
+def generate_captcha():
     captcha_text = build_captcha_text()
-    response = { "captchaUris": [] }
+    captcha_uris = []
     for word in captcha_text.split(" "):
         with io.BytesIO() as out:
             claptcha = Claptcha(word, "FreeMono.ttf", margin=(20, 10))
             image_b64 = base64.b64encode(claptcha.bytes[1].getvalue()).decode("utf-8")
-            response["captchaUris"].append("data:image/png;base64," + image_b64)
-    response["captchaToken"] = captcha_fernet.encrypt(captcha_text.encode("utf-8")).decode("utf-8")
-    return jsonify(response)
+            captcha_uris.append("data:image/png;base64," + image_b64)
+    return {
+        "text": captcha_text,
+        "captcha_uris": captcha_uris,
+    }
+
+
+@app.route("/get_captcha", methods=["GET"])
+def get_captcha():
+    captcha = generate_captcha()
+    return jsonify(
+        {
+            "captchaToken": captcha_fernet.encrypt(captcha["text"].encode("utf-8")).decode("utf-8"),
+            "captchaUris": captcha["captcha_uris"],
+        }
+    )
 
 
 def analyze_captcha(captcha_token, typed_captcha):
