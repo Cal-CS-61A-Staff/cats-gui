@@ -223,7 +223,7 @@ def record_meme():
 def wpm_threshold():
     with engine.connect() as conn:
         vals = conn.execute("SELECT wpm FROM leaderboard ORDER BY wpm DESC LIMIT 20").fetchall()
-        return jsonify(vals[-1] if len(vals) >= 20 else 0)
+        return jsonify(vals[-1][0] if len(vals) >= 20 else 0)
 
 
 @app.route("/leaderboard", methods=["POST"])
