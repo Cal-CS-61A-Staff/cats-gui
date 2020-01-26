@@ -102,11 +102,12 @@ def generate_p_token(paragraph):
     return p_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
 
 
-@app.route("/request_paragraph", methods=["POST"])
-def request_paragraph():
-    response = gui.request_paragraph(parse_qs(request.get_data().decode("ascii")))
-    response["pToken"] = generate_p_token(response["paragraph"])
-    return jsonify(response)
+def generate_s_token(paragraph):
+    return s_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+
+
+def generate_wpm_token(wpm):
+    return wpm_fernet.encrypt(str(wpm).encode("utf-8")).decode("utf-8")
 
 
 def verify_token(token, fernet, used_tokens, validity):
@@ -152,6 +153,23 @@ def verify_start_token(token, paragraph, start_time, end_time):
     return True
 
 
+def verify_wpm_token(token, wpm):
+    contents = float(wpm_fernet.decrypt(token).decode('utf-8'))
+    if not verify_token(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY):
+        return False
+    if round(contents, 1) != round(wpm, 1):
+        return False
+    mark_token_used(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY)
+    return True
+
+
+@app.route("/request_paragraph", methods=["POST"])
+def request_paragraph():
+    response = gui.request_paragraph(parse_qs(request.get_data().decode("ascii")))
+    response["pToken"] = generate_p_token(response["paragraph"])
+    return jsonify(response)
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
     analysis = gui.compute_accuracy(parse_qs(request.get_data().decode("ascii")))
@@ -161,12 +179,12 @@ def analyze():
     if request.form.get("pToken"):
         p_token = request.form.get("pToken").encode("utf-8")
         if verify_paragraph_token(p_token, paragraph):
-            analysis["sToken"] = s_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+            analysis["sToken"] = generate_s_token(paragraph)
     elif request.form.get("sToken") and paragraph == typed:
         s_token = request.form.get("sToken").encode("utf-8")
         wpm = analysis["wpm"]
         if verify_start_token(s_token, paragraph, float(request.form.get("startTime")), float(request.form.get("endTime"))) and wpm <= 200:
-            analysis["wpmToken"] = wpm_fernet.encrypt(str(wpm).encode("utf-8")).decode("utf-8")
+            analysis["wpmToken"] = generate_wpm_token(wpm)
 
     return jsonify(analysis)
 
@@ -298,16 +316,6 @@ def request_all_progress():
     targets = request.form.getlist("targets[]")
     out = [State.progress[target] for target in targets]
     return jsonify(out)
-
-
-def verify_wpm_token(token, wpm):
-    contents = float(wpm_fernet.decrypt(token).decode('utf-8'))
-    if not verify_token(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY):
-        return False
-    if round(contents, 1) != round(wpm, 1):
-        return False
-    mark_token_used(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY)
-    return True
 
 
 @app.route("/record_wpm", methods=["POST"])
