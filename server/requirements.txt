@@ -1,5 +1,6 @@
 Cryptography
 Flask
 gunicorn
+pyjwt
 SQLAlchemy
 mysqlclient
