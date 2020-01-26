@@ -103,11 +103,16 @@ def generate_p_token(paragraph):
     return jwt.encode({
         "hash": p_hash,
         "exp": round(time.time()) + P_TOKEN_VALIDITY,
-    }, token_key, algorithm="HS256").decode("utf-8")
+    }, token_key).decode("utf-8")
 
 
 def generate_s_token(paragraph):
-    return base64.encodestring(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+    s_hash = base64.encodestring(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+    return jwt.encode({
+        "hash": s_hash,
+        "iat": round(time.time()),
+        "exp": round(time.time()) + S_TOKEN_VALIDITY,
+    }, token_key).decode("utf-8")
 
 
 def generate_wpm_token(wpm):
@@ -145,16 +150,15 @@ def verify_paragraph_token(token, paragraph):
 
 
 def verify_start_token(token, paragraph, start_time, end_time):
-    contents = base64.decodebytes(token) # TODO Open JWT
-    timestamp = time.time() # TODO JWT timestamp
     if not verify_token(token, s_tokens_used, S_TOKEN_VALIDITY):
         return False
-    if contents != hash_message(paragraph.encode("utf-8")):
+    claims = jwt.decode(token, verify=False)
+    s_hash = base64.decodebytes(claims["hash"].encode("utf-8"))
+    timestamp = claims["iat"]
+    if s_hash != hash_message(paragraph.encode("utf-8")):
         return False
-    # if abs(timestamp - start_time) > TIMESTAMP_THRESHOLD:
-    #     return False
-    # if abs(time.time() - end_time) > TIMESTAMP_THRESHOLD:
-    #     return False
+    if abs(timestamp - start_time) > TIMESTAMP_THRESHOLD:
+        return False
     mark_token_used(token, s_tokens_used, S_TOKEN_VALIDITY)
     return True
 
