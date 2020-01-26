@@ -1,3 +1,4 @@
+import base64
 import os
 import time
 from collections import defaultdict
@@ -8,7 +9,6 @@ from urllib.parse import parse_qs
 
 from flask import Flask, jsonify, request, send_from_directory
 from sqlalchemy import create_engine, text
-from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 
@@ -50,10 +50,6 @@ with engine.connect() as conn:
     )
     conn.execute(statement)
 
-
-p_fernet = Fernet(Fernet.generate_key())
-s_fernet = Fernet(Fernet.generate_key())
-wpm_fernet = Fernet(Fernet.generate_key())
 
 p_tokens_used = {}
 s_tokens_used = {}
@@ -99,19 +95,19 @@ def hash_message(message):
 
 
 def generate_p_token(paragraph):
-    return p_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+    return base64.encodebytes(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
 
 
 def generate_s_token(paragraph):
-    return s_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+    return base64.encodestring(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
 
 
 def generate_wpm_token(wpm):
-    return wpm_fernet.encrypt(str(wpm).encode("utf-8")).decode("utf-8")
+    return str(wpm)
 
 
-def verify_token(token, fernet, used_tokens, validity):
-    timestamp = fernet.extract_timestamp(token)
+def verify_token(token, used_tokens, validity):
+    timestamp = time.time() # TODO JWT timestamp
     if token in used_tokens:
         return False
     if time.time() - timestamp > validity:
@@ -119,47 +115,47 @@ def verify_token(token, fernet, used_tokens, validity):
     return True
 
 
-def mark_token_used(token, fernet, used_tokens, validity):
+def mark_token_used(token, used_tokens, validity):
     for used_token, used_timestamp in list(used_tokens.items()):
         if used_timestamp - time.time() > validity:
             used_tokens.pop(used_token)
 
-    timestamp = fernet.extract_timestamp(token)
+    timestamp = time.time() # TODO JWT timestamp
     used_tokens[token] = timestamp
 
 
 def verify_paragraph_token(token, paragraph):
-    contents = p_fernet.decrypt(token)
-    if not verify_token(token, p_fernet, p_tokens_used, P_TOKEN_VALIDITY):
+    contents = base64.decodebytes(token) # TODO Open JWT
+    if not verify_token(token, p_tokens_used, P_TOKEN_VALIDITY):
         return False
     if contents != hash_message(paragraph.encode("utf-8")):
         return False
-    mark_token_used(token, p_fernet, p_tokens_used, P_TOKEN_VALIDITY)
+    mark_token_used(token, p_tokens_used, P_TOKEN_VALIDITY)
     return True
 
 
 def verify_start_token(token, paragraph, start_time, end_time):
-    contents = s_fernet.decrypt(token)
-    timestamp = s_fernet.extract_timestamp(token)
-    if not verify_token(token, s_fernet, s_tokens_used, S_TOKEN_VALIDITY):
+    contents = base64.decodebytes(token) # TODO Open JWT
+    timestamp = time.time() # TODO JWT timestamp
+    if not verify_token(token, s_tokens_used, S_TOKEN_VALIDITY):
         return False
     if contents != hash_message(paragraph.encode("utf-8")):
         return False
-    if abs(timestamp - start_time) > TIMESTAMP_THRESHOLD:
-        return False
-    if abs(time.time() - end_time) > TIMESTAMP_THRESHOLD:
-        return False
-    mark_token_used(token, s_fernet, s_tokens_used, S_TOKEN_VALIDITY)
+    # if abs(timestamp - start_time) > TIMESTAMP_THRESHOLD:
+    #     return False
+    # if abs(time.time() - end_time) > TIMESTAMP_THRESHOLD:
+    #     return False
+    mark_token_used(token, s_tokens_used, S_TOKEN_VALIDITY)
     return True
 
 
 def verify_wpm_token(token, wpm):
-    contents = float(wpm_fernet.decrypt(token).decode('utf-8'))
-    if not verify_token(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY):
+    contents = float(token) # TODO Open JWT
+    if not verify_token(token, wpm_tokens_used, WPM_TOKEN_VALIDITY):
         return False
     if round(contents, 1) != round(wpm, 1):
         return False
-    mark_token_used(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY)
+    mark_token_used(token, wpm_tokens_used, WPM_TOKEN_VALIDITY)
     return True
 
 
