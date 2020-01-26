@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from random import randrange
 from urllib.parse import parse_qs
 
+import jwt
 from flask import Flask, jsonify, request, send_from_directory
 from sqlalchemy import create_engine, text
 from cryptography.hazmat.backends import default_backend
@@ -26,6 +27,9 @@ P_TOKEN_VALIDITY = 3600
 S_TOKEN_VALIDITY = 3600
 WPM_TOKEN_VALIDITY = 3600
 TIMESTAMP_THRESHOLD = 60
+
+
+token_key = "secret key"
 
 
 if __name__ == "__main__":
@@ -95,7 +99,11 @@ def hash_message(message):
 
 
 def generate_p_token(paragraph):
-    return base64.encodebytes(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+    p_hash = base64.encodebytes(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+    return jwt.encode({
+        "hash": p_hash,
+        "exp": round(time.time()) + P_TOKEN_VALIDITY,
+    }, token_key, algorithm="HS256").decode("utf-8")
 
 
 def generate_s_token(paragraph):
@@ -107,12 +115,13 @@ def generate_wpm_token(wpm):
 
 
 def verify_token(token, used_tokens, validity):
-    timestamp = time.time() # TODO JWT timestamp
     if token in used_tokens:
         return False
-    if time.time() - timestamp > validity:
+    try:
+        jwt.decode(token, token_key)
+        return True
+    except jwt.exceptions.ExpiredSignatureError:
         return False
-    return True
 
 
 def mark_token_used(token, used_tokens, validity):
@@ -125,10 +134,11 @@ def mark_token_used(token, used_tokens, validity):
 
 
 def verify_paragraph_token(token, paragraph):
-    contents = base64.decodebytes(token) # TODO Open JWT
     if not verify_token(token, p_tokens_used, P_TOKEN_VALIDITY):
         return False
-    if contents != hash_message(paragraph.encode("utf-8")):
+    claims = jwt.decode(token, verify=False)
+    p_hash = base64.decodebytes(claims["hash"].encode("utf-8"))
+    if p_hash != hash_message(paragraph.encode("utf-8")):
         return False
     mark_token_used(token, p_tokens_used, P_TOKEN_VALIDITY)
     return True
