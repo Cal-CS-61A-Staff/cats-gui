@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from hashlib import sha256
 from random import randrange
+from secrets import token_bytes
 from urllib.parse import parse_qs
 
 import jwt
@@ -28,7 +29,7 @@ WPM_TOKEN_VALIDITY = 3600
 TIMESTAMP_THRESHOLD = 60
 
 
-token_key = "secret key"
+token_key = token_bytes(32)
 
 
 if __name__ == "__main__":
