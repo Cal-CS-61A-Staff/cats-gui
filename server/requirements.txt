@@ -1,4 +1,3 @@
-Cryptography
 Flask
 gunicorn
 pyjwt

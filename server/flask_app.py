@@ -4,14 +4,13 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from hashlib import sha256
 from random import randrange
 from urllib.parse import parse_qs
 
 import jwt
 from flask import Flask, jsonify, request, send_from_directory
 from sqlalchemy import create_engine, text
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
 
 import gui
 import typing_test
@@ -93,9 +92,7 @@ passthrough("/fastest_words")(lambda x: gui.fastest_words(x, lambda targets: [St
 
 
 def hash_message(message):
-    sha256 = hashes.Hash(hashes.SHA256(), backend=default_backend())
-    sha256.update(message)
-    return sha256.finalize()
+    return sha256(message).digest()
 
 
 def generate_p_token(paragraph):
