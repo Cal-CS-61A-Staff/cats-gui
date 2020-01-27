@@ -116,7 +116,10 @@ def generate_s_token(paragraph):
 
 
 def generate_wpm_token(wpm):
-    return str(wpm)
+    return jwt.encode({
+        "wpm": wpm,
+        "exp": round(time.time()) + WPM_TOKEN_VALIDITY,
+    }, token_key).decode("utf-8")
 
 
 def verify_token(token, used_tokens, validity):
@@ -164,10 +167,11 @@ def verify_start_token(token, paragraph, start_time, end_time):
 
 
 def verify_wpm_token(token, wpm):
-    contents = float(token) # TODO Open JWT
     if not verify_token(token, wpm_tokens_used, WPM_TOKEN_VALIDITY):
         return False
-    if round(contents, 1) != round(wpm, 1):
+    claims = jwt.decode(token, verify=False)
+    claimed_wpm = claims["wpm"]
+    if round(claimed_wpm, 1) != round(wpm, 1):
         return False
     mark_token_used(token, wpm_tokens_used, WPM_TOKEN_VALIDITY)
     return True
