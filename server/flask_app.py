@@ -99,6 +99,7 @@ def hash_message(message):
 
 
 def generate_p_token(paragraph):
+    print(paragraph)
     p_hash = base64.encodebytes(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
     return jwt.encode({
         "hash": p_hash,
@@ -122,7 +123,7 @@ def generate_wpm_token(wpm):
     }, token_key).decode("utf-8")
 
 
-def verify_token(token, used_tokens, validity):
+def verify_token(token, used_tokens):
     if token in used_tokens:
         return False
     try:
@@ -132,28 +133,28 @@ def verify_token(token, used_tokens, validity):
         return False
 
 
-def mark_token_used(token, used_tokens, validity):
-    for used_token, used_timestamp in list(used_tokens.items()):
-        if used_timestamp - time.time() > validity:
+def mark_token_used(token, used_tokens):
+    for used_token, exp in list(used_tokens.items()):
+        if exp < time.time():
             used_tokens.pop(used_token)
 
-    timestamp = time.time() # TODO JWT timestamp
-    used_tokens[token] = timestamp
+    exp = jwt.decode(token, verify=False)["exp"]
+    used_tokens[token] = exp
 
 
 def verify_paragraph_token(token, paragraph):
-    if not verify_token(token, p_tokens_used, P_TOKEN_VALIDITY):
+    if not verify_token(token, p_tokens_used):
         return False
     claims = jwt.decode(token, verify=False)
     p_hash = base64.decodebytes(claims["hash"].encode("utf-8"))
     if p_hash != hash_message(paragraph.encode("utf-8")):
         return False
-    mark_token_used(token, p_tokens_used, P_TOKEN_VALIDITY)
+    mark_token_used(token, p_tokens_used)
     return True
 
 
 def verify_start_token(token, paragraph, start_time, end_time):
-    if not verify_token(token, s_tokens_used, S_TOKEN_VALIDITY):
+    if not verify_token(token, s_tokens_used):
         return False
     claims = jwt.decode(token, verify=False)
     s_hash = base64.decodebytes(claims["hash"].encode("utf-8"))
@@ -162,18 +163,18 @@ def verify_start_token(token, paragraph, start_time, end_time):
         return False
     if abs(timestamp - start_time) > TIMESTAMP_THRESHOLD:
         return False
-    mark_token_used(token, s_tokens_used, S_TOKEN_VALIDITY)
+    mark_token_used(token, s_tokens_used)
     return True
 
 
 def verify_wpm_token(token, wpm):
-    if not verify_token(token, wpm_tokens_used, WPM_TOKEN_VALIDITY):
+    if not verify_token(token, wpm_tokens_used):
         return False
     claims = jwt.decode(token, verify=False)
     claimed_wpm = claims["wpm"]
     if round(claimed_wpm, 1) != round(wpm, 1):
         return False
-    mark_token_used(token, wpm_tokens_used, WPM_TOKEN_VALIDITY)
+    mark_token_used(token, wpm_tokens_used)
     return True
 
 
@@ -245,7 +246,7 @@ def request_match():
             max(datetime.now() - join_time for recent_time, join_time in State.queue.values()) >= MAX_WAIT and \
             len(State.queue) >= MIN_PLAYERS:
         # start game!
-        curr_text = gui.request_paragraph(None)
+        curr_text = gui.request_paragraph(None)["paragraph"]
         game_id = get_id()
 
         for player in State.queue:
