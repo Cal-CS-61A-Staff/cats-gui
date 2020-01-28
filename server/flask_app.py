@@ -1,16 +1,28 @@
+import base64
+import io
 import os
+import random
 import time
+
+from claptcha import Claptcha
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from queue import Queue
 from random import randrange
+from threading import Thread
 from urllib.parse import parse_qs
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, make_response, request, send_from_directory
 from sqlalchemy import create_engine, text
+from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
 
 import gui
 import typing_test
+
+from gui import WORDS_LIST
 
 app = Flask(__name__, static_url_path="", static_folder="static")
 
@@ -18,6 +30,21 @@ MIN_PLAYERS = 2
 MAX_PLAYERS = 4
 QUEUE_TIMEOUT = timedelta(seconds=1)
 MAX_WAIT = timedelta(seconds=5)
+
+CAPTCHA_QUEUE_LEN = 5
+CAPTCHA_WPM_THRESHOLD = 100
+CAPTCHA_WORD_LENGTH_RANGE = (4, 6)
+CAPTCHA_LAST_POSSIBLE_INDEX = 999
+CAPTCHA_NUM_WORDS = 40
+CAPTCHA_ACCURACY_THRESHOLD = 80.0
+CAPTCHA_VERIFIED_WPM_SCALE = 1.5
+VERIFY_PERIOD = 86400
+
+P_TOKEN_VALIDITY = 3600
+S_TOKEN_VALIDITY = 3600
+WPM_TOKEN_VALIDITY = 3600
+CAPTCHA_TOKEN_VALIDITY = 3600
+TIMESTAMP_THRESHOLD = 60
 
 
 if __name__ == "__main__":
@@ -29,20 +56,32 @@ else:
 with engine.connect() as conn:
     statement = text(
         """CREATE TABLE IF NOT EXISTS leaderboard (
-    username varchar(128),
-    wpm integer,
-    PRIMARY KEY (`username`)
+    username varchar(32),
+    wpm integer
 );"""
     )
     conn.execute(statement)
     statement = text(
         """CREATE TABLE IF NOT EXISTS memeboard (
-    username varchar(128),
-    wpm integer,
-    PRIMARY KEY (`username`)
+    username varchar(1024),
+    wpm integer
 );"""
     )
     conn.execute(statement)
+
+
+p_fernet = Fernet(Fernet.generate_key())
+s_fernet = Fernet(Fernet.generate_key())
+wpm_fernet = Fernet(Fernet.generate_key())
+captcha_fernet = Fernet(Fernet.generate_key())
+verify_fernet = Fernet(Fernet.generate_key())
+
+p_tokens_used = {}
+s_tokens_used = {}
+wpm_tokens_used = {}
+captcha_tokens_used = {}
+
+captcha_queue = Queue()
 
 
 @dataclass
@@ -73,10 +112,99 @@ def index():
     return send_from_directory("static", "index.html")
 
 
-passthrough("/request_paragraph")(gui.request_paragraph)
-passthrough("/analyze")(gui.compute_accuracy)
 passthrough("/autocorrect")(gui.autocorrect)
 passthrough("/fastest_words")(lambda x: gui.fastest_words(x, lambda targets: [State.progress[target] for target in targets["targets[]"]]))
+
+
+def hash_message(message):
+    sha256 = hashes.Hash(hashes.SHA256(), backend=default_backend())
+    sha256.update(message)
+    return sha256.finalize()
+
+
+def generate_p_token(paragraph):
+    return p_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+
+
+@app.route("/request_paragraph", methods=["POST"])
+def request_paragraph():
+    response = gui.request_paragraph(parse_qs(request.get_data().decode("ascii")))
+    response["pToken"] = generate_p_token(response["paragraph"])
+    return jsonify(response)
+
+
+def verify_token(token, fernet, used_tokens, validity):
+    try:
+        timestamp = fernet.extract_timestamp(token)
+    except:
+        return False
+    if token in used_tokens:
+        return False
+    if time.time() - timestamp > validity:
+        return False
+    return True
+
+
+def mark_token_used(token, fernet, used_tokens, validity):
+    for used_token, used_timestamp in list(used_tokens.items()):
+        if used_timestamp - time.time() > validity:
+            used_tokens.pop(used_token)
+
+    timestamp = fernet.extract_timestamp(token)
+    used_tokens[token] = timestamp
+
+
+def verify_paragraph_token(token, paragraph):
+    if not verify_token(token, p_fernet, p_tokens_used, P_TOKEN_VALIDITY):
+        return False
+    contents = p_fernet.decrypt(token)
+    if contents != hash_message(paragraph.encode("utf-8")):
+        return False
+    mark_token_used(token, p_fernet, p_tokens_used, P_TOKEN_VALIDITY)
+    return True
+
+
+def verify_start_token(token, paragraph, start_time, end_time):
+    if not verify_token(token, s_fernet, s_tokens_used, S_TOKEN_VALIDITY):
+        return False
+    contents = s_fernet.decrypt(token)
+    timestamp = s_fernet.extract_timestamp(token)
+    if contents != hash_message(paragraph.encode("utf-8")):
+        return False
+    if abs(timestamp - start_time) > TIMESTAMP_THRESHOLD:
+        return False
+    if abs(time.time() - end_time) > TIMESTAMP_THRESHOLD:
+        return False
+    mark_token_used(token, s_fernet, s_tokens_used, S_TOKEN_VALIDITY)
+    return True
+
+
+def retreive_verified_wpm(token):
+    if verify_token(token, verify_fernet, {}, VERIFY_PERIOD):
+        return float(verify_fernet.decrypt(token).decode("utf-8"))
+    else:
+        return 0.0
+
+
+@app.route("/analyze", methods=["POST"])
+def analyze():
+    analysis = gui.compute_accuracy(parse_qs(request.get_data().decode("ascii")))
+    paragraph = request.form.get("promptedText")
+    typed = request.form.get("typedText")
+
+    if request.form.get("pToken"):
+        p_token = request.form.get("pToken").encode("utf-8")
+        if verify_paragraph_token(p_token, paragraph):
+            analysis["sToken"] = s_fernet.encrypt(hash_message(paragraph.encode("utf-8"))).decode("utf-8")
+    elif request.form.get("sToken") and paragraph == typed:
+        s_token = request.form.get("sToken").encode("utf-8")
+        wpm = analysis["wpm"]
+        verified_wpm = 0.0 if not request.cookies.get("verified_wpm") else retreive_verified_wpm(request.cookies.get("verified_wpm").encode("utf-8"))
+        if verify_start_token(s_token, paragraph, float(request.form.get("startTime")), float(request.form.get("endTime"))) and wpm <= 200:
+            analysis["wpmToken"] = wpm_fernet.encrypt(str(wpm).encode("utf-8")).decode("utf-8")
+            analysis["captchaRequired"] = wpm >= CAPTCHA_WPM_THRESHOLD and wpm > verified_wpm
+
+    return jsonify(analysis)
 
 
 def get_id():
@@ -98,6 +226,7 @@ def request_match():
             {
                 "start": True,
                 "text": State.game_data[game_id]["text"],
+                "pToken": generate_p_token(State.game_data[game_id]["text"]),
                 "players": State.game_data[game_id]["players"],
             }
         )
@@ -135,9 +264,21 @@ def request_match():
 
         State.queue = {}
 
-        return jsonify({"start": True, "text": curr_text, "players": list(queue.keys())})
+        return jsonify(
+            {
+                "start": True,
+                "text": curr_text,
+                "pToken": generate_p_token(curr_text),
+                "players": list(queue.keys()),
+            }
+        )
     else:
-        return jsonify({"start": False, "numWaiting": len(State.queue)})
+        return jsonify(
+            {
+                "start": False,
+                "numWaiting": len(State.queue),
+            }
+        )
 
 
 @app.route("/report_progress", methods=["POST"])
@@ -195,15 +336,40 @@ def request_all_progress():
     return jsonify(out)
 
 
+def verify_wpm_token(token, wpm):
+    if not verify_token(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY):
+        return False
+    contents = float(wpm_fernet.decrypt(token).decode('utf-8'))
+    if round(contents, 1) != round(wpm, 1):
+        return False
+    mark_token_used(token, wpm_fernet, wpm_tokens_used, WPM_TOKEN_VALIDITY)
+    return True
+
+
 @app.route("/record_wpm", methods=["POST"])
 def record_name():
     username = request.form.get("username")
     wpm = float(request.form.get("wpm"))
-    confirm_string = request.form.get("confirm")
-
-    if len(username) > 30 or wpm > 200 or confirm_string != "If you want to mess around, send requests to /record_meme! Leave this endpoint for legit submissions please. Don't be a jerk and ruin this for everyone, thanks!":
-        return record_meme()
-
+    wpm_token = request.form.get("wpmToken").encode("utf-8")
+    verified_wpm = 0.0 if not request.cookies.get("verified_wpm") else retreive_verified_wpm(request.cookies.get("verified_wpm").encode("utf-8"))
+    if not verify_wpm_token(wpm_token, wpm):
+        return jsonify(
+            {
+                "response": "Invalid WPM or WPM token",
+            }
+        ), 400
+    if len(username) > 32:
+        return jsonify(
+            {
+                "response": "Username too long",
+            }
+        ), 400
+    if wpm >= CAPTCHA_WPM_THRESHOLD and wpm > verified_wpm:
+        return jsonify(
+            {
+                "response": "CAPTCHA verification failed",
+            }
+        ), 400
     with engine.connect() as conn:
         conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
     return ""
@@ -213,7 +379,12 @@ def record_name():
 def record_meme():
     username = request.form.get("username")
     wpm = float(request.form.get("wpm"))
-
+    if len(username) > 1024:
+        return jsonify(
+            {
+                "response": "Make it shorter!",
+            }
+        ), 400
     with engine.connect() as conn:
         conn.execute("INSERT INTO memeboard (username, wpm) VALUES (%s, %s)", [username, wpm])
     return ""
@@ -236,6 +407,86 @@ def leaderboard():
 def memeboard():
     with engine.connect() as conn:
         return jsonify(list(list(x) for x in conn.execute("SELECT username, wpm FROM memeboard ORDER BY wpm DESC LIMIT 20").fetchall()))
+
+
+def build_captcha_text():
+    possible_words = WORDS_LIST[:CAPTCHA_LAST_POSSIBLE_INDEX]
+    possible_words = [word for word in possible_words if CAPTCHA_WORD_LENGTH_RANGE[0] <= len(word) <= CAPTCHA_WORD_LENGTH_RANGE[1]]
+    return " ".join(random.sample(possible_words, CAPTCHA_NUM_WORDS))
+
+
+def generate_captcha():
+    captcha_text = build_captcha_text()
+    captcha_uris = []
+    for word in captcha_text.split(" "):
+        with io.BytesIO() as out:
+            claptcha = Claptcha(word, "FreeMono.ttf", margin=(20, 10), noise=0.3)
+            image_b64 = base64.b64encode(claptcha.bytes[1].getvalue()).decode("utf-8")
+            captcha_uris.append("data:image/png;base64," + image_b64)
+    return {
+        "text": captcha_text,
+        "captcha_uris": captcha_uris,
+    }
+
+
+def populate_captcha_queue():
+    while captcha_queue.qsize() < CAPTCHA_QUEUE_LEN:
+        captcha_queue.put(generate_captcha())
+
+
+@app.route("/get_captcha", methods=["GET"])
+def get_captcha():
+    t = Thread(target=populate_captcha_queue)
+    t.start()
+    captcha = captcha_queue.get()
+    return jsonify(
+        {
+            "captchaToken": captcha_fernet.encrypt(captcha["text"].encode("utf-8")).decode("utf-8"),
+            "captchaUris": captcha["captcha_uris"],
+        }
+    )
+
+
+def analyze_captcha(captcha_token, typed_captcha):
+    if not verify_token(captcha_token, captcha_fernet, captcha_tokens_used, CAPTCHA_TOKEN_VALIDITY):
+        return 0.0
+    mark_token_used(captcha_token, captcha_fernet, captcha_tokens_used, CAPTCHA_TOKEN_VALIDITY)
+    captcha = captcha_fernet.decrypt(captcha_token).decode("utf-8")
+    captcha_wpm = typing_test.wpm(typed_captcha, time.time() - captcha_fernet.extract_timestamp(captcha_token))
+    captcha_accuracy = typing_test.accuracy(typed_captcha, captcha) * len(typed_captcha.split(" ")) / CAPTCHA_NUM_WORDS
+    return captcha_wpm, captcha_accuracy
+
+
+@app.route("/submit_captcha", methods=["POST"])
+def submit_captcha():
+    captcha_token = request.form.get("captchaToken").encode("utf-8")
+    typed_captcha = request.form.get("typedCaptcha")
+    captcha_wpm, captcha_accuracy = analyze_captcha(captcha_token, typed_captcha)
+    if captcha_accuracy >= CAPTCHA_ACCURACY_THRESHOLD:
+        verified_wpm = captcha_wpm * CAPTCHA_VERIFIED_WPM_SCALE
+        verify_token = verify_fernet.encrypt(str(verified_wpm).encode("utf-8"))
+        response = make_response(jsonify(
+            {
+                "passed": True,
+                "wpm": captcha_wpm,
+                "accuracy": captcha_accuracy,
+                "verified": verified_wpm,
+            }
+        ))
+        response.set_cookie("verified_wpm", verify_token.decode("utf-8"), max_age=VERIFY_PERIOD)
+        return response
+    else:
+        return jsonify(
+            {
+                "passed": False,
+                "wpm": captcha_wpm,
+                "accuracy": captcha_accuracy,
+            }
+        )
+
+
+t = Thread(target=populate_captcha_queue)
+t.start()
 
 
 if __name__ == "__main__":

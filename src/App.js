@@ -4,6 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.min.js";
 import $ from "jquery";
 import Button from "react-bootstrap/Button.js";
+import CaptchaDialog from "./CaptchaDialog.js";
 import Input from "./Input.js";
 import Indicators from "./Indicators.js";
 import Leaderboard from "./Leaderboard.js";
@@ -43,6 +44,16 @@ class App extends Component {
             fastestWords: "",
             showUsernameEntry: false,
             memes: false,
+            pToken: "",
+            sToken: "",
+            wpmToken: "",
+            username: "",
+            captchaRequired: false,
+            captchaUris: [],
+            captchaToken: "",
+            showCaptcha: false,
+            captchaSubmitted: false,
+            captchaPassed: false,
         };
         this.timer = null;
         this.multiplayerTimer = null;
@@ -84,9 +95,14 @@ class App extends Component {
         });
 
         $.post("/request_paragraph").done((data) => {
+            this.setState({
+                pToken: data.pToken,
+                sToken: "",
+                wpmToken: "",
+            });
             if (this.state.pigLatin) {
                 $.post("/translate_to_pig_latin", {
-                    text: data,
+                    text: data.paragraph,
                 }, (translated) => {
                     this.setState({
                         promptedWords: translated.split(" "),
@@ -94,7 +110,7 @@ class App extends Component {
                 });
             } else {
                 this.setState({
-                    promptedWords: data.split(" "),
+                    promptedWords: data.paragraph.split(" "),
                 });
             }
         });
@@ -121,12 +137,30 @@ class App extends Component {
             typedText,
             startTime: this.state.startTime,
             endTime: this.getCurrTime(),
+            pToken: this.state.pToken,
+            sToken: this.state.sToken,
         }).done((data) => {
             this.setState({
-                wpm: data[0].toFixed(1),
-                accuracy: data[1].toFixed(1),
+                wpm: data.wpm.toFixed(1),
+                accuracy: data.accuracy.toFixed(1),
                 currTime: this.getCurrTime(),
             });
+            if (data.hasOwnProperty("sToken")) {
+                this.setState({
+                    pToken: "",
+                    sToken: data.sToken
+                });
+            } else if (data.hasOwnProperty("wpmToken")) {
+                this.setState({
+                    sToken: "",
+                    wpmToken: data.wpmToken,
+                });
+                if (data.hasOwnProperty("captchaRequired")) {
+                    this.setState({
+                        captchaRequired: data.captchaRequired,
+                    });
+                }
+            }
         });
     };
 
@@ -265,6 +299,7 @@ class App extends Component {
                     progress: new Array(data.players.length).fill([0, 0]),
                     pigLatin: false,
                     autoCorrect: false,
+                    pToken: data.pToken,
                 });
                 clearInterval(this.multiplayerTimer);
                 this.multiplayerTimer = setInterval(this.requestProgress, 500);
@@ -284,19 +319,81 @@ class App extends Component {
     };
 
     handleUsernameSubmission = (username) => {
-        $.post("/record_wpm", {
-            username,
-            wpm: this.state.wpm,
-            confirm: "If you want to mess around, send requests"
-                + " to /record_meme! Leave this endpoint for legit submissions please. Don't be a"
-                + " jerk and ruin this for everyone, thanks!",
+        this.setState({
+            username: username,
+        }, () => {
+            if (this.state.captchaRequired) {
+                this.requestCaptcha();
+            } else {
+                this.submitUsername("");
+            }
         });
         this.hideUsernameEntry();
     };
 
+    submitUsername = () => {
+        $.post("/record_wpm", {
+            username: this.state.username,
+            wpm: this.state.wpm,
+            wpmToken: this.state.wpmToken,
+        });
+        this.setState({
+            username: "",
+            wpmToken: "",
+        });
+    }
+
     hideUsernameEntry = () => {
         this.setState({ showUsernameEntry: false });
     };
+
+    requestCaptcha = () => {
+        $.get("/get_captcha").done((data) => {
+            this.setState({
+                captchaUris: data.captchaUris,
+                captchaToken: data.captchaToken,
+                showCaptcha: true,
+            });
+        });
+    }
+
+    handleSubmitCaptcha = (typedCaptcha) => {
+        $.post("/submit_captcha", {
+            captchaToken: this.state.captchaToken,
+            typedCaptcha: typedCaptcha,
+        }).done((data) => {
+            if (data.passed && data.verified >= this.state.wpm) {
+                this.submitUsername(typedCaptcha);
+                this.setState({
+                    captchaSubmitted: true,
+                    captchaPassed: true,
+                });
+                setTimeout(() => {
+                    this.setState({
+                        captchaUris: [],
+                        showCaptcha: false,
+                        captchaSubmitted: false,
+                        captchaPassed: false,
+                    });
+                }, 1000);
+            } else {
+                this.setState({
+                    captchaSubmitted: true,
+                    captchaPassed: false,
+                });
+                setTimeout(() => {
+                    this.requestCaptcha();
+                    this.setState({
+                        captchaSubmitted: false,
+                        captchaPassed: false,
+                    });
+                }, 1000);
+            }
+        });
+        this.setState({
+            captchaToken: "",
+        });
+    }
 
     render() {
         const {
@@ -387,6 +484,14 @@ class App extends Component {
                     show={this.state.showUsernameEntry}
                     onHide={this.hideUsernameEntry}
                     onSubmit={this.handleUsernameSubmission}
+                    captchaRequired={this.state.captchaRequired}
+                />
+                <CaptchaDialog
+                    show={this.state.showCaptcha}
+                    captchaUris={this.state.captchaUris}
+                    submitted={this.state.captchaSubmitted}
+                    passed={this.state.captchaPassed}
+                    handleSubmitCaptcha={this.handleSubmitCaptcha}
                 />
             </>
         );

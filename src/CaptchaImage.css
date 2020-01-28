@@ -1,0 +1,7 @@
+.CaptchaImage {
+    line-height: 2.5rem;
+}
+
+.CaptchaImage img {
+    height: 2rem;
+}
