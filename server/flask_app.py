@@ -34,16 +34,14 @@ with engine.connect() as conn:
     statement = text(
         """CREATE TABLE IF NOT EXISTS leaderboard (
     username varchar(128),
-    wpm integer,
-    PRIMARY KEY (`username`)
+    wpm integer
 );"""
     )
     conn.execute(statement)
     statement = text(
         """CREATE TABLE IF NOT EXISTS memeboard (
     username varchar(128),
-    wpm integer,
-    PRIMARY KEY (`username`)
+    wpm integer
 );"""
     )
     conn.execute(statement)
@@ -60,6 +58,8 @@ class State:
 
 
 State = State()
+
+used_wpm_nonces = {}
 
 def get_from_gui(f, request):
     return f(parse_qs(request.get_data().decode("ascii")))
@@ -98,6 +98,10 @@ def analyze():
 
     if claimed == session.get("paragraph") and typed == claimed and 'end' not in session:
         session["end"] = time.time()
+        wpm_nonce = os.urandom(32)
+        while wpm_nonce in used_wpm_nonces:
+            wpm_nonce = os.urandom(32)
+        session["wpm_nonce"] = wpm_nonce
 
     return analysis
 
@@ -241,10 +245,17 @@ def record_name():
             }
         ), 400
 
-    if "start" not in session or "end" not in session or "paragraph" not in session:
+    if "start" not in session or "end" not in session or "paragraph" not in session or "wpm_nonce" not in session:
         return jsonify(
             {
                 "error": "Unable to calculate real WPM from session",
+            }
+        ), 400
+
+    if session["wpm_nonce"] in used_wpm_nonces:
+        return jsonify(
+            {
+                "error": "Nonce already used"
             }
         ), 400
 
@@ -252,6 +263,13 @@ def record_name():
     wpm = float(request.form.get("wpm"))
 
     real_wpm = typing_test.wpm(session["paragraph"], session["end"] - session["start"])
+
+    used_wpm_nonces[session["wpm_nonce"]] = session["wpm_nonce"]
+    session.pop("paragraph", None)
+    session.pop("start", None)
+    session.pop("end", None)
+    session.pop("wpm_nonce", None)
+
     if abs(wpm - real_wpm) > WPM_THRESHOLD:
         return jsonify(
             {
