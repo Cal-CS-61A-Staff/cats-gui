@@ -2,7 +2,7 @@
 
 `yarn` to install dependencies - do this when you first download it!
 
-`cd server && python flask_app.py & yarn start` - start web server and webpack dev server
+`yarn start` - start web server and webpack dev server
 
 `yarn build` - generate built version in `deploy` folder, that can be pasted into `berkeley-cs61a`
 
