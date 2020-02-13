@@ -93,8 +93,10 @@ def compute_accuracy(data):
     typed_text = data.get("typedText", [""])[0]
     start_time = float(data["startTime"][0])
     end_time = float(data["endTime"][0])
-    return [typing_test.wpm(typed_text, end_time - start_time),
-            typing_test.accuracy(typed_text, prompted_text)]
+    return {
+        "wpm": typing_test.wpm(typed_text, end_time - start_time),
+        "accuracy": typing_test.accuracy(typed_text, prompted_text),
+    }
 
 
 def similar(w, v, n):

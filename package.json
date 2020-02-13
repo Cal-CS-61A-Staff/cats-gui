@@ -14,7 +14,7 @@
 		"react-scripts": "3.0.1"
 	},
 	"scripts": {
-		"start": "react-scripts start",
+		"start": "concurrently -n react,flask \"react-scripts start\" \"cd server && nodemon --ext py --exec python3 flask_app.py\"",
 		"build": "react-scripts build && rm -rf deploy && mkdir deploy && cp -r server/ deploy && mv build deploy/static",
 		"deploy": "cd deploy/ && rm -rf .git && git init && git add -A && git commit -m \"init\" && git remote add dokku dokku@apps.cs61a.org:cats && git push --force dokku master",
 		"test": "react-scripts test",
@@ -36,10 +36,12 @@
 		]
 	},
 	"devDependencies": {
+		"concurrently": "^5.1.0",
 		"eslint-config-airbnb": "^18.0.1",
 		"eslint-config-fbjs": "^3.1.0",
 		"eslint-plugin-babel": "^5.3.0",
 		"eslint-plugin-jsx-a11y": "^6.2.3",
-		"eslint-plugin-react": "^7.14.3"
+		"eslint-plugin-react": "^7.14.3",
+		"nodemon": "^2.0.2"
 	}
 }
