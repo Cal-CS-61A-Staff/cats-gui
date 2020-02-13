@@ -21,7 +21,7 @@ QUEUE_TIMEOUT = timedelta(seconds=1)
 MAX_WAIT = timedelta(seconds=5)
 
 
-WPM_THRESHOLD = 30
+WPM_THRESHOLD = 10
 
 
 if __name__ == "__main__":
@@ -82,7 +82,6 @@ def index():
 @app.route("/request_paragraph", methods=["POST"])
 def request_paragraph():
     paragraph = get_from_gui(gui.request_paragraph, request)
-    session.clear()
     session["paragraph"] = paragraph
     return paragraph
 
@@ -95,6 +94,8 @@ def analyze():
 
     if claimed == session.get("paragraph") and 'start' not in session:
         session["start"] = time.time()
+        session.pop("end", None)
+        session.pop("wpm_nonce", None)
 
     if claimed == session.get("paragraph") and typed == claimed and 'end' not in session:
         session["end"] = time.time()
@@ -152,6 +153,7 @@ def request_match():
             len(State.queue) >= MIN_PLAYERS:
         # start game!
         curr_text = gui.request_paragraph(None)
+        session["paragraph"] = curr_text
         game_id = get_id()
 
         for player in State.queue:
@@ -265,10 +267,6 @@ def record_name():
     real_wpm = typing_test.wpm(session["paragraph"], session["end"] - session["start"])
 
     used_wpm_nonces[session["wpm_nonce"]] = session["wpm_nonce"]
-    session.pop("paragraph", None)
-    session.pop("start", None)
-    session.pop("end", None)
-    session.pop("wpm_nonce", None)
 
     if abs(wpm - real_wpm) > WPM_THRESHOLD:
         return jsonify(
