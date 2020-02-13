@@ -6,18 +6,22 @@ from datetime import datetime, timedelta
 from random import randrange
 from urllib.parse import parse_qs
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, session
 from sqlalchemy import create_engine, text
 
 import gui
 import typing_test
 
 app = Flask(__name__, static_url_path="", static_folder="static")
+app.config["SECRET_KEY"] = os.urandom(32)
 
 MIN_PLAYERS = 2
 MAX_PLAYERS = 4
 QUEUE_TIMEOUT = timedelta(seconds=1)
 MAX_WAIT = timedelta(seconds=5)
+
+
+WPM_THRESHOLD = 30
 
 
 if __name__ == "__main__":
@@ -57,12 +61,14 @@ class State:
 
 State = State()
 
+def get_from_gui(f, request):
+    return f(parse_qs(request.get_data().decode("ascii")))
 
 def passthrough(path):
     def decorator(f):
         @app.route(path, methods=["POST"], endpoint=f.__name__)
         def decorated():
-            return jsonify(f(parse_qs(request.get_data().decode("ascii"))))
+            return jsonify(get_from_gui(f, request))
 
         return decorated
     return decorator
@@ -73,8 +79,29 @@ def index():
     return send_from_directory("static", "index.html")
 
 
-passthrough("/request_paragraph")(gui.request_paragraph)
-passthrough("/analyze")(gui.compute_accuracy)
+@app.route("/request_paragraph", methods=["POST"])
+def request_paragraph():
+    paragraph = get_from_gui(gui.request_paragraph, request)
+    session.clear()
+    session["paragraph"] = paragraph
+    return paragraph
+
+
+@app.route("/analyze", methods=["POST"])
+def analyze():
+    analysis = get_from_gui(gui.compute_accuracy, request)
+    claimed = request.form.get("promptedText")
+    typed = request.form.get("typedText")
+
+    if claimed == session.get("paragraph") and 'start' not in session:
+        session["start"] = time.time()
+
+    if claimed == session.get("paragraph") and typed == claimed and 'end' not in session:
+        session["end"] = time.time()
+
+    return analysis
+
+
 passthrough("/autocorrect")(gui.autocorrect)
 passthrough("/fastest_words")(lambda x: gui.fastest_words(x, lambda targets: [State.progress[target] for target in targets["targets[]"]]))
 
@@ -172,12 +199,9 @@ def record_progress(id, progress, updated):
         prompt = State.game_data[game_id]["text"]
         wpm = len(prompt) / (time.time() - State.progress[id][0][1]) * 60 / 5
 
-        if wpm > 200:
-            return ""
-
         with engine.connect() as conn:
             conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (?, ?)", ["<student playing locally>", wpm])
-    return ""
+    return "", 204
 
 
 @app.route("/request_progress", methods=["POST"])
@@ -197,16 +221,47 @@ def request_all_progress():
 
 @app.route("/record_wpm", methods=["POST"])
 def record_name():
+    if "username" not in request.form:
+        return jsonify(
+            {
+                "error": "No username present",
+            }
+        ), 400
+    elif len(request.form["username"]) > 30:
+        return jsonify(
+            {
+                "error": "Username too long",
+            }
+        ), 400
+
+    if "wpm" not in request.form:
+        return jsonify(
+            {
+                "error": "No WPM present",
+            }
+        ), 400
+
+    if "start" not in session or "end" not in session or "paragraph" not in session:
+        return jsonify(
+            {
+                "error": "Unable to calculate real WPM from session",
+            }
+        ), 400
+
     username = request.form.get("username")
     wpm = float(request.form.get("wpm"))
-    confirm_string = request.form.get("confirm")
 
-    if len(username) > 30 or wpm > 200 or confirm_string != "If you want to mess around, send requests to /record_meme! Leave this endpoint for legit submissions please. Don't be a jerk and ruin this for everyone, thanks!":
-        return record_meme()
+    real_wpm = typing_test.wpm(session["paragraph"], session["end"] - session["start"])
+    if abs(wpm - real_wpm) > WPM_THRESHOLD:
+        return jsonify(
+            {
+                "error": "Invalid WPM",
+            }
+        ), 400
 
     with engine.connect() as conn:
         conn.execute("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
-    return ""
+    return "", 204
 
 
 @app.route("/record_meme", methods=["POST"])
@@ -216,7 +271,7 @@ def record_meme():
 
     with engine.connect() as conn:
         conn.execute("INSERT INTO memeboard (username, wpm) VALUES (%s, %s)", [username, wpm])
-    return ""
+    return "", 204
 
 
 @app.route("/wpm_threshold", methods=["POST"])

@@ -287,9 +287,6 @@ class App extends Component {
         $.post("/record_wpm", {
             username,
             wpm: this.state.wpm,
-            confirm: "If you want to mess around, send requests"
-                + " to /record_meme! Leave this endpoint for legit submissions please. Don't be a"
-                + " jerk and ruin this for everyone, thanks!",
         });
         this.hideUsernameEntry();
     };
