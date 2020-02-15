@@ -2,7 +2,6 @@ import React, { Component } from "react";
 import "./App.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.min.js";
-import $ from "jquery";
 import Button from "react-bootstrap/Button.js";
 import Input from "./Input.js";
 import Indicators from "./Indicators.js";
@@ -10,6 +9,7 @@ import Leaderboard from "./Leaderboard.js";
 import LoadingDialog from "./LoadingDialog.js";
 import Options from "./Options.js";
 import OpeningDialog from "./OpeningDialog.js";
+import post from "./post";
 import Prompt from "./Prompt.js";
 import ProgressBars from "./ProgressBars.js";
 import NamePrompt from "./NamePrompt.js";
@@ -27,8 +27,8 @@ class App extends Component {
         this.state = {
             promptedWords: ["Please wait - loading!"],
             typedWords: [],
-            wpm: "None",
-            accuracy: "None",
+            wpm: null,
+            accuracy: null,
             startTime: 0,
             currTime: 0,
             pigLatin: false,
@@ -47,7 +47,7 @@ class App extends Component {
         this.timer = null;
         this.multiplayerTimer = null;
 
-        $.post("/request_id").done((id) => {
+        post("/request_id").then((id) => {
             if (id !== null) {
                 this.setState({ id: id.toString(), mode: Mode.WELCOME });
             }
@@ -79,15 +79,15 @@ class App extends Component {
             typedWords: [],
             currWord: "",
             inputActive: true,
-            wpm: "None",
-            accuracy: "None",
+            wpm: null,
+            accuracy: null,
         });
 
-        $.post("/request_paragraph").done((data) => {
+        post("/request_paragraph").then((data) => {
             if (this.state.pigLatin) {
-                $.post("/translate_to_pig_latin", {
+                post("/translate_to_pig_latin", {
                     text: data,
-                }, (translated) => {
+                }).then((translated) => {
                     this.setState({
                         promptedWords: translated.split(" "),
                     });
@@ -113,53 +113,46 @@ class App extends Component {
         });
     };
 
-    updateReadouts = () => {
+    updateReadouts = async () => {
         const promptedText = this.state.promptedWords.join(" ");
         const typedText = this.state.typedWords.join(" ");
-        $.post("/analyze", {
+        const { wpm, accuracy } = await post("/analyze", {
             promptedText,
             typedText,
             startTime: this.state.startTime,
             endTime: this.getCurrTime(),
-        }).done((data) => {
-            this.setState({
-                wpm: data[0].toFixed(1),
-                accuracy: data[1].toFixed(1),
-                currTime: this.getCurrTime(),
-            });
         });
+        this.setState({ wpm, accuracy, currTime: this.getCurrTime() });
     };
 
     reportProgress = () => {
         const promptedText = this.state.promptedWords.join(" ");
-        $.post("/report_progress", {
+        post("/report_progress", {
             id: this.state.id,
             typed: this.state.typedWords.join(" "),
             prompt: promptedText,
         });
     };
 
-    requestProgress = () => {
-        $.post("/request_progress", {
+    requestProgress = async () => {
+        const progress = await post("/request_progress", {
             targets: this.state.playerList,
-        }).done((progress) => {
-            this.setState({
-                progress,
-            });
-            if (progress.every((p) => p[0] === 1.0)) {
-                clearInterval(this.multiplayerTimer);
-                this.fastestWords();
-            }
         });
+        this.setState({
+            progress,
+        });
+        if (progress.every((p) => p[0] === 1.0)) {
+            clearInterval(this.multiplayerTimer);
+            this.fastestWords();
+        }
     };
 
-    fastestWords = () => {
-        $.post("/fastest_words", {
+    fastestWords = async () => {
+        const fastestWords = await post("/fastest_words", {
             targets: this.state.playerList,
             prompt: this.state.promptedWords.join(" "),
-        }).done((fastestWords) => {
-            this.setState({ fastestWords });
         });
+        this.setState({ fastestWords });
     };
 
     popPrevWord = () => {
@@ -192,7 +185,7 @@ class App extends Component {
 
         this.setState((state) => {
             if (state.autoCorrect && word !== state.promptedWords[wordIndex]) {
-                $.post("/autocorrect", { word }).done((data) => {
+                post("/autocorrect", { word }).then((data) => {
                     // eslint-disable-next-line no-shadow
                     this.setState((state) => {
                         if (state.typedWords[wordIndex] !== word) {
@@ -204,7 +197,6 @@ class App extends Component {
                     });
                 });
             }
-
             return {
                 typedWords: state.typedWords.concat([word]),
                 currWord: "",
@@ -214,18 +206,19 @@ class App extends Component {
         return true;
     };
 
-    handleChange = (currWord) => {
+    handleChange = async (currWord) => {
         this.setState({ currWord });
         if (this.state.typedWords.length + 1 === this.state.promptedWords.length
-            && this.state.promptedWords[this.state.promptedWords.length - 1] === currWord) {
+            && this.state.promptedWords[this.state.promptedWords.length - 1] === currWord
+        && (this.state.mode === Mode.SINGLE
+                || this.state.typedWords.concat([currWord]).join(" ") === this.state.promptedWords.join(" "))) {
             clearInterval(this.timer);
             this.setState({ inputActive: false });
             this.handleWordTyped(currWord);
-            $.post("/wpm_threshold", (threshold) => {
-                if (this.state.wpm >= threshold && parseFloat(this.state.accuracy) === 100) {
-                    this.setState({ showUsernameEntry: true });
-                }
-            });
+            const threshold = await post("/wpm_threshold");
+            if (this.state.wpm >= threshold && parseFloat(this.state.accuracy) === 100) {
+                this.setState({ showUsernameEntry: true });
+            }
         } else if (!this.timer) {
             this.restart();
         }
@@ -254,26 +247,25 @@ class App extends Component {
         }
     };
 
-    requestMatch = () => {
-        $.post("/request_match", { id: this.state.id }).done((data) => {
-            if (data.start) {
-                this.setState({
-                    mode: Mode.MULTI,
-                    playerList: data.players,
-                    numPlayers: data.players.length,
-                    promptedWords: data.text.split(" "),
-                    progress: new Array(data.players.length).fill([0, 0]),
-                    pigLatin: false,
-                    autoCorrect: false,
-                });
-                clearInterval(this.multiplayerTimer);
-                this.multiplayerTimer = setInterval(this.requestProgress, 500);
-            } else {
-                this.setState({
-                    numPlayers: data.numWaiting,
-                });
-            }
-        });
+    requestMatch = async () => {
+        const data = await post("/request_match", { id: this.state.id });
+        if (data.start) {
+            this.setState({
+                mode: Mode.MULTI,
+                playerList: data.players,
+                numPlayers: data.players.length,
+                promptedWords: data.text.split(" "),
+                progress: new Array(data.players.length).fill([0, 0]),
+                pigLatin: false,
+                autoCorrect: false,
+            });
+            clearInterval(this.multiplayerTimer);
+            this.multiplayerTimer = setInterval(this.requestProgress, 500);
+        } else {
+            this.setState({
+                numPlayers: data.numWaiting,
+            });
+        }
     };
 
     toggleLeaderBoard = (memes) => {
@@ -283,8 +275,8 @@ class App extends Component {
         }));
     };
 
-    handleUsernameSubmission = (username) => {
-        $.post("/record_wpm", {
+    handleUsernameSubmission = async (username) => {
+        await post("/record_wpm", {
             username,
             wpm: this.state.wpm,
             confirm: "If you want to mess around, send requests"
@@ -318,7 +310,6 @@ class App extends Component {
                             <br />
                             <div className="LeaderboardButton">
                                 <Button onClick={() => this.toggleLeaderBoard(false)} variant="outline-dark">Leaderboard</Button>
-                                <Button onClick={() => this.toggleLeaderBoard(true)} variant="outline-dark">Memeboard</Button>
                             </div>
                             <h1 className="display-4 mainTitle">
                                 {/* eslint-disable-next-line react/jsx-one-expression-per-line */}

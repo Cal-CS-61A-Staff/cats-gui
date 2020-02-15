@@ -1,12 +1,14 @@
 import React from "react";
 import "./Indicators.css";
 
-export default function Indicators(props) {
+const formatNum = (num) => (num ? num.toFixed(1) : "None");
+
+export default function Indicators({ wpm, accuracy, remainingTime }) {
     return (
         <div className="Indicators">
-            <Indicator text={`WPM: ${props.wpm}`} />
-            <Indicator text={`Accuracy: ${props.accuracy}`} />
-            <Indicator text={`Time: ${props.remainingTime}`} />
+            <Indicator text={`WPM: ${formatNum(wpm)}`} />
+            <Indicator text={`Accuracy: ${formatNum(accuracy)}`} />
+            <Indicator text={`Time: ${remainingTime}`} />
         </div>
     );
 }
