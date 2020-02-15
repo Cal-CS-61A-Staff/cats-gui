@@ -1,24 +1,26 @@
 import React, { useState, useEffect } from "react";
 import Modal from "react-bootstrap/Modal";
 import "./Leaderboard.css";
-import $ from "jquery";
 import LeaderboardEntry from "./LeaderboardEntry.js";
+import post from "./post";
 
 export default function Leaderboard(props) {
     const [leaderboard, setLeaderboard] = useState([]);
     useEffect(() => {
         if (props.show) {
             if (props.memes) {
-                $.post("/memeboard", (data) => {
+                post("/memeboard").then((data) => {
                     setLeaderboard(data);
                 });
             } else {
-                $.post("/leaderboard", (data) => {
+                post("/leaderboard").then((data) => {
                     setLeaderboard(data);
                 });
             }
+        } else {
+            setLeaderboard([]);
         }
-    }, [props.show]);
+    }, [props.show, props.memes]);
     return (
         <Modal
             size="md"
