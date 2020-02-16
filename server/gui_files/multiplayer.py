@@ -3,13 +3,22 @@ from collections import namedtuple, defaultdict
 from datetime import datetime, timedelta
 from random import randrange
 
+import typing_test
 from gui_files.common_server import route, forward_to_server, server_only
 from gui_files.db import connect_db, setup_db
+from gui_files.leaderboard_integrity import get_authorized_limit, get_captcha_urls, encode_challenge, decode_challenge, \
+    create_wpm_authorization
 
 MIN_PLAYERS = 2
 MAX_PLAYERS = 4
 QUEUE_TIMEOUT = timedelta(seconds=1)
 MAX_WAIT = timedelta(seconds=5)
+
+MAX_NAME_LENGTH = 30
+
+MAX_UNVERIFIED_WPM = 90
+CAPTCHA_ACCURACY_THRESHOLD = 70
+CAPTCHA_SLOWDOWN_FACTOR = 0.7
 
 
 def db_init():
@@ -111,29 +120,72 @@ def create_multiplayer_server():
 
     @route
     @forward_to_server
-    def record_wpm(username, wpm, confirm):
-        if len(username) > 30 or wpm > 200 or confirm != "If you want to mess around, send requests to /record_meme! Leave this endpoint for legit submissions please. Don't be a jerk and ruin this for everyone, thanks!":
-            return "lol"
+    def record_wpm(name, user, wpm, token):
+        authorized_limit = get_authorized_limit(user=user, token=token)
+
+        if wpm > max(MAX_UNVERIFIED_WPM, authorized_limit) or len(name) > MAX_NAME_LENGTH:
+            return
 
         with connect_db() as db:
-            db("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [username, wpm])
-        return ""
+            db("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [name, wpm])
 
     @route
     @forward_to_server
-    def wpm_threshold():
+    def check_leaderboard_eligibility(wpm, user, token):
         with connect_db() as db:
             vals = db("SELECT wpm FROM leaderboard ORDER BY wpm DESC LIMIT 20").fetchall()
-            return vals[-1][0] if len(vals) >= 20 else 0
+            threshold = vals[-1][0] if len(vals) >= 20 else 0
+
+        authorized_limit = get_authorized_limit(user=user, token=token)
+
+        return {
+            "eligible": wpm >= threshold,
+            "needVerify": wpm > max(authorized_limit, MAX_UNVERIFIED_WPM)
+        }
+
+    @route
+    @forward_to_server
+    def request_wpm_challenge(user):
+        captcha_image_urls, words = get_captcha_urls()
+        token = encode_challenge(user, words)
+        return {
+            "images": captcha_image_urls,
+            "token": token,
+        }
+
+    @route
+    @forward_to_server
+    def claim_wpm_challenge(user, token, typed, claimed_wpm):
+        challenge_user, reference, start_time = decode_challenge(token=token)
+        end_time = time.time()
+
+        if user != challenge_user:
+            return
+
+        accuracy = typing_test.accuracy(" ".join(typed), " ".join(reference))
+        wpm = typing_test.wpm(" ".join(reference), end_time - start_time)
+
+        if wpm < claimed_wpm * CAPTCHA_SLOWDOWN_FACTOR:
+            # too slow!
+            return {
+                "success": False,
+                "message": "Your captcha was typed too slowly!"
+            }
+
+        if accuracy < CAPTCHA_ACCURACY_THRESHOLD:
+            # too inaccurate!
+            return {
+                "success": False,
+                "message": "You made too many mistakes!"
+            }
+
+        return {
+            "success": True,
+            "token": create_wpm_authorization(user, claimed_wpm)
+        }
 
     @route
     @forward_to_server
     def leaderboard():
         with connect_db() as db:
             return list(list(x) for x in db("SELECT username, wpm FROM leaderboard ORDER BY wpm DESC LIMIT 20").fetchall())
-
-    @route
-    @forward_to_server
-    def memeboard():
-        with connect_db() as db:
-            return list(list(x) for x in db("SELECT username, wpm FROM memeboard ORDER BY wpm DESC LIMIT 20").fetchall())

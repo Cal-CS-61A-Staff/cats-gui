@@ -6,7 +6,7 @@ from random import randrange
 
 import typing_test
 from gui_files.common_server import Server, route, sendto, start
-from gui_files import multiplayer_server
+from gui_files import multiplayer
 
 PORT = 31415
 DEFAULT_SERVER = 'https://cats.cs61a.org'
@@ -15,8 +15,7 @@ PARAGRAPH_PATH = "./data/sample_paragraphs.txt"
 WORDS_LIST = typing_test.lines_from_file('data/words.txt')
 WORDS_SET = set(WORDS_LIST)
 LETTER_SETS = [(w, set(w)) for w in WORDS_LIST]
-LIMIT = 2
-PATHS = {}
+SIMILARITY_LIMIT = 2
 
 
 @route
@@ -52,12 +51,12 @@ def autocorrect(word=""):
 
     # Heuristically choose candidate words to score.
     letters = set(word)
-    candidates = [w for w, s in LETTER_SETS if similar(s, letters, LIMIT)]
+    candidates = [w for w, s in LETTER_SETS if similar(s, letters, SIMILARITY_LIMIT)]
 
     # Try various diff functions until one doesn't raise an exception.
     for fn in [typing_test.final_diff, typing_test.edit_diff, typing_test.swap_diff]:
         try:
-            guess = typing_test.autocorrect(word, candidates, fn, LIMIT)
+            guess = typing_test.autocorrect(word, candidates, fn, SIMILARITY_LIMIT)
             return reformat(guess, raw_word)
         except BaseException:
             pass
@@ -112,8 +111,8 @@ def fastest_words(prompt, targets):
     return typing_test.fastest_words_report(word_times)
 
 
-multiplayer_server.create_multiplayer_server()
+multiplayer.create_multiplayer_server()
 
 
 if __name__ == "__main__" or "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
-    app = start(PORT, DEFAULT_SERVER, GUI_FOLDER, multiplayer_server.db_init)
+    app = start(PORT, DEFAULT_SERVER, GUI_FOLDER, multiplayer.db_init)
