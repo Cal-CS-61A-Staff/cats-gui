@@ -29,7 +29,7 @@ def db_init():
         name varchar(128),
         user_id varchar(128),
         wpm double,
-        PRIMARY KEY (`username`)
+        PRIMARY KEY (`user_id`)
     );"""
         )
 
@@ -122,7 +122,7 @@ def create_multiplayer_server():
 
         with connect_db() as db:
             db("DELETE FROM leaderboard WHERE user_id = (%s)", [user])
-            db("INSERT INTO leaderboard (name, user_id, wpm) VALUES (%s, %s)", [name, user, wpm])
+            db("INSERT INTO leaderboard (name, user_id, wpm) VALUES (%s, %s, %s)", [name, user, wpm])
 
     @route
     @forward_to_server
@@ -130,6 +130,9 @@ def create_multiplayer_server():
         with connect_db() as db:
             vals = db("SELECT wpm FROM leaderboard ORDER BY wpm DESC LIMIT 20").fetchall()
             threshold = vals[-1][0] if len(vals) >= 20 else 0
+            prev_best = db("SELECT wpm FROM leaderboard WHERE user=(%s)", [user]).fetchone()
+            if prev_best:
+                threshold = max(threshold, prev_best[0])
 
         authorized_limit = get_authorized_limit(user=user, token=token)
 
@@ -183,4 +186,4 @@ def create_multiplayer_server():
     @forward_to_server
     def leaderboard():
         with connect_db() as db:
-            return list(list(x) for x in db("SELECT username, wpm FROM leaderboard ORDER BY wpm DESC LIMIT 20").fetchall())
+            return list(list(x) for x in db("SELECT name, wpm FROM leaderboard ORDER BY wpm DESC LIMIT 20").fetchall())
