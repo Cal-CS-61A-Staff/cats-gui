@@ -13,16 +13,16 @@ export default function TopicPicker({ onClick }) {
     };
 
     const handleClick = () => {
-        onClick(topics.split(",").map((x) => x.trim().toLowerCase()).filter((x) => x.length));
+        onClick(topics.split(/\s|,/).map((x) => x.trim().toLowerCase()).filter((x) => x.length));
     };
 
     return (
         <div className="TopicPicker">
-            <Form>
+            <Form onSubmit={(e) => { e.preventDefault(); handleClick(); }}>
                 <Form.Label>Specify topics of interest</Form.Label>
                 <Form.Row>
                     <Col>
-                        <Form.Control type="email" placeholder="Cat, Cats, Kittens, ..." value={topics} onChange={handleChange} />
+                        <Form.Control placeholder="Cat, Cats, Kittens, ..." value={topics} onChange={handleChange} />
                     </Col>
                     <Button variant="primary" onClick={handleClick}>
                         Submit

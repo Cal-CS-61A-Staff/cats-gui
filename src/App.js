@@ -3,6 +3,7 @@ import "./App.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.min.js";
 import Button from "react-bootstrap/Button.js";
+import FastestWordsDisplay from "./FastestWordsDisplay";
 import Input from "./Input.js";
 import Indicators from "./Indicators.js";
 import Leaderboard from "./Leaderboard.js";
@@ -41,7 +42,7 @@ class App extends Component {
             playerList: [],
             progress: [],
             showLeaderboard: false,
-            fastestWords: "",
+            fastestWords: [],
             showUsernameEntry: false,
             topics: [],
         };
@@ -82,6 +83,7 @@ class App extends Component {
             inputActive: true,
             wpm: null,
             accuracy: null,
+            fastestWords: [],
         });
 
         post("/request_paragraph", { topics: this.state.topics }).then((data) => {
@@ -142,7 +144,7 @@ class App extends Component {
         this.setState({
             progress,
         });
-        if (progress.every((p) => p[0] === 1.0)) {
+        if (progress.every(([x]) => x === 1.0)) {
             clearInterval(this.multiplayerTimer);
             this.fastestWords();
         }
@@ -300,11 +302,6 @@ class App extends Component {
         } = this.state;
         const remainingTime = (currTime - startTime).toFixed(1);
         const playerIndex = playerList.indexOf(id);
-        const fastestWordsDisplay = (
-            <div>
-                <pre>{fastestWords}</pre>
-            </div>
-        );
 
         return (
             <>
@@ -364,8 +361,13 @@ class App extends Component {
                                     <TopicPicker onClick={this.handleSetTopics} />
                                 </>
                             )}
-                            {this.state.mode === Mode.MULTI && fastestWordsDisplay}
-
+                            {this.state.mode === Mode.MULTI
+                            && (
+                                <FastestWordsDisplay
+                                    playerIndex={playerIndex}
+                                    fastestWords={fastestWords}
+                                />
+                            )}
                         </div>
                     </div>
                 </div>

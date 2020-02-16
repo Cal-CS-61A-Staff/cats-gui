@@ -3,7 +3,6 @@
 import os
 import random
 import string
-from random import randrange
 
 import typing_test
 from gui_files.common_server import Server, route, sendto, start
@@ -111,7 +110,7 @@ def fastest_words(prompt, targets):
     word_times = [[typing_test.word_time(w, p[1] - s) for w, p in zip(words, ps)]
                   for s, ps in zip(start_times, progress)]
 
-    return typing_test.fastest_words_report(word_times)
+    return typing_test.fastest_words(word_times)
 
 
 multiplayer_server.create_multiplayer_server()
