@@ -1,12 +1,12 @@
 import os
+import random
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from random import randrange
 from urllib.parse import parse_qs
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, make_response, request, send_from_directory
 from sqlalchemy import create_engine, text
 
 import gui
@@ -73,6 +73,16 @@ def index():
     return send_from_directory("static", "index.html")
 
 
+@app.route("/favicon.ico")
+def favicon():
+    favicons = os.listdir("static/favicons")
+    response = make_response(send_from_directory("static/favicons", random.choice(favicons)))
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Expires"] = "0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
 passthrough("/request_paragraph")(gui.request_paragraph)
 passthrough("/analyze")(gui.compute_accuracy)
 passthrough("/autocorrect")(gui.autocorrect)
@@ -80,7 +90,7 @@ passthrough("/fastest_words")(lambda x: gui.fastest_words(x, lambda targets: [St
 
 
 def get_id():
-    return randrange(1000000000)
+    return random.randrange(1000000000)
 
 
 @app.route("/request_id", methods=["POST"])
