@@ -1,6 +1,7 @@
 """Web server for the typing GUI."""
 
 import os
+import random
 import string
 from random import randrange
 
@@ -20,11 +21,12 @@ PATHS = {}
 
 
 @route
-def request_paragraph():
+def request_paragraph(topics=None):
     """Return a random paragraph."""
     paragraphs = typing_test.lines_from_file(PARAGRAPH_PATH)
-    paragraph_index = randrange(len(paragraphs))
-    return typing_test.choose(paragraphs, lambda x: True, paragraph_index)
+    random.shuffle(paragraphs)
+    select = typing_test.about(topics) if topics else lambda x: True
+    return typing_test.choose(paragraphs, select, 0)
 
 
 @route
