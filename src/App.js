@@ -14,7 +14,7 @@ import post from "./post";
 import Prompt from "./Prompt.js";
 import ProgressBars from "./ProgressBars.js";
 import HighScorePrompt from "./HighScorePrompt.js";
-import { getCurrTime } from "./utils";
+import { getCurrTime, randomString } from "./utils";
 
 export const Mode = {
     SINGLE: "single",
@@ -55,6 +55,10 @@ class App extends Component {
                 this.setState({ id: id.toString(), mode: Mode.WELCOME });
             }
         });
+
+        if (!Cookies.get("user")) {
+            Cookies.set("user", randomString(32));
+        }
     }
 
     componentDidMount() {
@@ -217,7 +221,9 @@ class App extends Component {
             this.setState({ inputActive: false });
             this.handleWordTyped(currWord);
             const token = Cookies.get("token") || null;
-            const { eligible, needVerify } = await post("/check_leaderboard_eligibility", { user: null, wpm: this.state.wpm, token });
+            const { eligible, needVerify } = await post("/check_leaderboard_eligibility", {
+                user: Cookies.get("user"), wpm: this.state.wpm, token,
+            });
             if (eligible && this.state.accuracy === 100) {
                 this.setState({ showUsernameEntry: true, needVerify });
             }
@@ -280,7 +286,7 @@ class App extends Component {
     handleUsernameSubmission = async (name) => {
         await post("/record_wpm", {
             name,
-            user: null,
+            user: Cookies.get("user"),
             wpm: this.state.wpm,
             token: Cookies.get("token") || null,
         });

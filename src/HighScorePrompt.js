@@ -20,7 +20,7 @@ export default function HighScorePrompt({
 
     const requestChallenge = async () => {
         const { images: receivedImages, token: receivedToken } = await post("/request_wpm_challenge", {
-            user: null,
+            user: Cookies.get("user"),
         });
         setImages(receivedImages);
         token.current = receivedToken;
@@ -28,7 +28,7 @@ export default function HighScorePrompt({
 
     const submitChallenge = async (typed) => {
         const { success, message: failureMessage, token: successToken } = await post("/claim_wpm_challenge", {
-            user: null,
+            user: Cookies.get("user"),
             token: token.current,
             typed,
             claimedWpm: wpm,

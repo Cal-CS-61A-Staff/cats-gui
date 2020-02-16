@@ -26,14 +26,8 @@ def db_init():
     with connect_db() as db:
         db(
             """CREATE TABLE IF NOT EXISTS leaderboard (
-        username varchar(128),
-        wpm double,
-        PRIMARY KEY (`username`)
-    );"""
-        )
-        db(
-            """CREATE TABLE IF NOT EXISTS memeboard (
-        username varchar(128),
+        name varchar(128),
+        user_id varchar(128),
         wpm double,
         PRIMARY KEY (`username`)
     );"""
@@ -127,7 +121,8 @@ def create_multiplayer_server():
             return
 
         with connect_db() as db:
-            db("INSERT INTO leaderboard (username, wpm) VALUES (%s, %s)", [name, wpm])
+            db("DELETE FROM leaderboard WHERE user_id = (%s)", [user])
+            db("INSERT INTO leaderboard (name, user_id, wpm) VALUES (%s, %s)", [name, user, wpm])
 
     @route
     @forward_to_server
