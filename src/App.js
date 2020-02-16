@@ -4,6 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.min.js";
 import Button from "react-bootstrap/Button.js";
 import Cookies from "js-cookie";
+import FastestWordsDisplay from "./FastestWordsDisplay";
 import Input from "./Input.js";
 import Indicators from "./Indicators.js";
 import Leaderboard from "./Leaderboard.js";
@@ -14,6 +15,7 @@ import post from "./post";
 import Prompt from "./Prompt.js";
 import ProgressBars from "./ProgressBars.js";
 import HighScorePrompt from "./HighScorePrompt.js";
+import TopicPicker from "./TopicPicker";
 import { getCurrTime, randomString } from "./utils";
 
 export const Mode = {
@@ -42,10 +44,10 @@ class App extends Component {
             playerList: [],
             progress: [],
             showLeaderboard: false,
-            fastestWords: "",
+            fastestWords: [],
             showUsernameEntry: false,
             needVerify: false,
-            memes: false,
+            topics: [],
         };
         this.timer = null;
         this.multiplayerTimer = null;
@@ -88,9 +90,10 @@ class App extends Component {
             inputActive: true,
             wpm: null,
             accuracy: null,
+            fastestWords: [],
         });
 
-        post("/request_paragraph").then((data) => {
+        post("/request_paragraph", { topics: this.state.topics }).then((data) => {
             if (this.state.pigLatin) {
                 post("/translate_to_pig_latin", {
                     text: data,
@@ -148,7 +151,7 @@ class App extends Component {
         this.setState({
             progress,
         });
-        if (progress.every((p) => p[0] === 1.0)) {
+        if (progress.every(([x]) => x === 1.0)) {
             clearInterval(this.multiplayerTimer);
             this.fastestWords();
         }
@@ -276,11 +279,14 @@ class App extends Component {
         }
     };
 
-    toggleLeaderBoard = (memes) => {
+    toggleLeaderBoard = () => {
         this.setState(({ showLeaderboard }) => ({
             showLeaderboard: !showLeaderboard,
-            memes,
         }));
+    };
+
+    handleSetTopics = (topics) => {
+        this.setState({ topics }, this.initialize);
     };
 
     handleUsernameSubmission = async (name) => {
@@ -303,11 +309,6 @@ class App extends Component {
         } = this.state;
         const remainingTime = (currTime - startTime).toFixed(1);
         const playerIndex = playerList.indexOf(id);
-        const fastestWordsDisplay = (
-            <div>
-                <pre>{fastestWords}</pre>
-            </div>
-        );
 
         return (
             <>
@@ -355,15 +356,25 @@ class App extends Component {
                             <br />
                             {this.state.mode !== Mode.MULTI
                             && (
-                                <Options
-                                    pigLatin={this.state.pigLatin}
-                                    onPigLatinToggle={this.handlePigLatinToggle}
-                                    autoCorrect={this.state.autoCorrect}
-                                    onAutoCorrectToggle={this.handleAutoCorrectToggle}
-                                    onRestart={this.initialize}
+                                <>
+                                    <Options
+                                        pigLatin={this.state.pigLatin}
+                                        onPigLatinToggle={this.handlePigLatinToggle}
+                                        autoCorrect={this.state.autoCorrect}
+                                        onAutoCorrectToggle={this.handleAutoCorrectToggle}
+                                        onRestart={this.initialize}
+                                    />
+                                    <br />
+                                    <TopicPicker onClick={this.handleSetTopics} />
+                                </>
+                            )}
+                            {this.state.mode === Mode.MULTI
+                            && (
+                                <FastestWordsDisplay
+                                    playerIndex={playerIndex}
+                                    fastestWords={fastestWords}
                                 />
                             )}
-                            {this.state.mode === Mode.MULTI && fastestWordsDisplay}
                         </div>
                     </div>
                 </div>
@@ -378,7 +389,6 @@ class App extends Component {
                 />
                 <Leaderboard
                     show={this.state.showLeaderboard}
-                    memes={this.state.memes}
                     onHide={this.toggleLeaderBoard}
                 />
                 <HighScorePrompt

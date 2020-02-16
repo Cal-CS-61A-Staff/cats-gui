@@ -1,8 +1,8 @@
 """Web server for the typing GUI."""
 
 import os
+import random
 import string
-from random import randrange
 
 import typing_test
 from gui_files.common_server import Server, route, sendto, start
@@ -19,11 +19,12 @@ SIMILARITY_LIMIT = 2
 
 
 @route
-def request_paragraph():
+def request_paragraph(topics=None):
     """Return a random paragraph."""
     paragraphs = typing_test.lines_from_file(PARAGRAPH_PATH)
-    paragraph_index = randrange(len(paragraphs))
-    return typing_test.choose(paragraphs, lambda x: True, paragraph_index)
+    random.shuffle(paragraphs)
+    select = typing_test.about(topics) if topics else lambda x: True
+    return typing_test.choose(paragraphs, select, 0)
 
 
 @route
@@ -108,7 +109,7 @@ def fastest_words(prompt, targets):
     word_times = [[typing_test.word_time(w, p[1] - s) for w, p in zip(words, ps)]
                   for s, ps in zip(start_times, progress)]
 
-    return typing_test.fastest_words_report(word_times)
+    return typing_test.fastest_words(word_times)
 
 
 multiplayer.create_multiplayer_server()
