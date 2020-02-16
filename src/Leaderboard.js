@@ -8,19 +8,13 @@ export default function Leaderboard(props) {
     const [leaderboard, setLeaderboard] = useState([]);
     useEffect(() => {
         if (props.show) {
-            if (props.memes) {
-                post("/memeboard").then((data) => {
-                    setLeaderboard(data);
-                });
-            } else {
-                post("/leaderboard").then((data) => {
-                    setLeaderboard(data);
-                });
-            }
+            post("/leaderboard").then((data) => {
+                setLeaderboard(data);
+            });
         } else {
             setLeaderboard([]);
         }
-    }, [props.show, props.memes]);
+    }, [props.show]);
     return (
         <Modal
             size="md"
