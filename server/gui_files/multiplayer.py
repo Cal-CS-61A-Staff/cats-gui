@@ -39,9 +39,8 @@ def create_multiplayer_server():
     State = State({}, {}, {}, defaultdict(list))
 
     @route
-    @forward_to_server
-    def request_id():
-        assert cats.enable_multiplayer
+    @server_only
+    def provide_id():
         return randrange(1000000000)
 
     @route
@@ -150,6 +149,7 @@ def create_multiplayer_server():
         return {
             "images": captcha_image_urls,
             "token": token,
+            "lastWordLen": len(words[-1])
         }
 
     @route
@@ -161,7 +161,7 @@ def create_multiplayer_server():
         if user != challenge_user:
             return
 
-        accuracy = cats.accuracy(" ".join(typed[:-1]), " ".join(reference[:-1]))
+        accuracy = cats.accuracy(" ".join(typed), " ".join(reference))
         wpm = cats.wpm(" ".join(reference), end_time - start_time)
 
         if wpm < claimed_wpm * CAPTCHA_SLOWDOWN_FACTOR:

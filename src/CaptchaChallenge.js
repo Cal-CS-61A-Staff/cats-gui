@@ -6,7 +6,7 @@ import Input from "./Input";
 import post from "./post";
 import { formatNum, getCurrTime, useInterval } from "./utils";
 
-export default function CaptchaChallenge({ images, onSubmit }) {
+export default function CaptchaChallenge({ images, lastWordLen, onSubmit }) {
     const [typedWords, setTypedWords] = useState([]);
     const [currWord, setCurrWord] = useState("");
     const [startTime] = useState(getCurrTime());
@@ -23,6 +23,12 @@ export default function CaptchaChallenge({ images, onSubmit }) {
         });
         setWPM(newWPM);
         setCurrWord(word);
+        if (typedWords.length + 1 === images.length && word && word.length === lastWordLen) {
+            setTypedWords(typedWords.concat([word]));
+            setCurrWord("");
+            setActive(false);
+            onSubmit(typedWords.concat([word]));
+        }
     };
 
     useInterval(updateWPM, 100);
@@ -33,10 +39,6 @@ export default function CaptchaChallenge({ images, onSubmit }) {
         }
         setCurrWord("");
         setTypedWords(typedWords.concat([word]));
-        if (typedWords.length + 2 === images.length) {
-            onSubmit(typedWords);
-            setActive(false);
-        }
         return true;
     };
 

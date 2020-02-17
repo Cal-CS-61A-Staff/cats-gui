@@ -10,6 +10,7 @@ export default function HighScorePrompt({
     show, onHide, needVerify, wpm, onSubmit,
 }) {
     const [images, setImages] = useState([]);
+    const [lastWordLen, setLastWordLen] = useState([]);
     const [message, setMessage] = useState("");
     const [verified, setVerified] = useState(!needVerify);
     const token = useRef(null);
@@ -19,10 +20,11 @@ export default function HighScorePrompt({
     }
 
     const requestChallenge = async () => {
-        const { images: receivedImages, token: receivedToken } = await post("/request_wpm_challenge", {
+        const { images: receivedImages, token: receivedToken, lastWordLen: receivedLastWordLen } = await post("/request_wpm_challenge", {
             user: Cookies.get("user"),
         });
         setImages(receivedImages);
+        setLastWordLen(receivedLastWordLen);
         token.current = receivedToken;
     };
 
@@ -43,7 +45,7 @@ export default function HighScorePrompt({
     };
 
     const captcha = images.length
-        ? <CaptchaChallenge images={images} onSubmit={submitChallenge} />
+        ? <CaptchaChallenge images={images} lastWordLen={lastWordLen} onSubmit={submitChallenge} />
         : <CaptchaPrompt message={message} onClick={requestChallenge} />;
     const contents = verified ? <NameForm onSubmit={onSubmit} /> : captcha;
 

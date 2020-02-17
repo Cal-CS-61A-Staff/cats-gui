@@ -92,6 +92,13 @@ def reformat(word, raw_word):
 ###############
 
 @route
+def request_id():
+    if not cats.enable_multiplayer:
+        return
+    return Server.provide_id()
+
+
+@route
 def report_progress(id, typed, prompt):
     """Report progress to the multiplayer server and also return it."""
     typed = typed.split()  # A list of word strings
