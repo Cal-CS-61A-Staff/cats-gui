@@ -130,7 +130,7 @@ def create_multiplayer_server():
         with connect_db() as db:
             vals = db("SELECT wpm FROM leaderboard ORDER BY wpm DESC LIMIT 20").fetchall()
             threshold = vals[-1][0] if len(vals) >= 20 else 0
-            prev_best = db("SELECT wpm FROM leaderboard WHERE user=(%s)", [user]).fetchone()
+            prev_best = db("SELECT wpm FROM leaderboard WHERE user_id=(%s)", [user]).fetchone()
             if prev_best:
                 threshold = max(threshold, prev_best[0])
 
