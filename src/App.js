@@ -3,6 +3,7 @@ import "./App.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.min.js";
 import Button from "react-bootstrap/Button.js";
+import Cookies from "js-cookie";
 import FastestWordsDisplay from "./FastestWordsDisplay";
 import Input from "./Input.js";
 import Indicators from "./Indicators.js";
@@ -13,8 +14,9 @@ import OpeningDialog from "./OpeningDialog.js";
 import post from "./post";
 import Prompt from "./Prompt.js";
 import ProgressBars from "./ProgressBars.js";
-import NamePrompt from "./NamePrompt.js";
+import HighScorePrompt from "./HighScorePrompt.js";
 import TopicPicker from "./TopicPicker";
+import { getCurrTime, randomString } from "./utils";
 
 export const Mode = {
     SINGLE: "single",
@@ -44,6 +46,7 @@ class App extends Component {
             showLeaderboard: false,
             fastestWords: [],
             showUsernameEntry: false,
+            needVerify: false,
             topics: [],
         };
         this.timer = null;
@@ -54,6 +57,10 @@ class App extends Component {
                 this.setState({ id: id.toString(), mode: Mode.WELCOME });
             }
         });
+
+        if (!Cookies.get("user")) {
+            Cookies.set("user", randomString(32));
+        }
     }
 
     componentDidMount() {
@@ -111,8 +118,8 @@ class App extends Component {
     restart = () => {
         this.timer = setInterval(this.updateReadouts, 100);
         this.setState({
-            startTime: this.getCurrTime(),
-            currTime: this.getCurrTime(),
+            startTime: getCurrTime(),
+            currTime: getCurrTime(),
         });
     };
 
@@ -123,9 +130,9 @@ class App extends Component {
             promptedText,
             typedText,
             startTime: this.state.startTime,
-            endTime: this.getCurrTime(),
+            endTime: getCurrTime(),
         });
-        this.setState({ wpm, accuracy, currTime: this.getCurrTime() });
+        this.setState({ wpm, accuracy, currTime: getCurrTime() });
     };
 
     reportProgress = () => {
@@ -170,8 +177,6 @@ class App extends Component {
         }
     };
 
-    getCurrTime = () => (new Date()).getTime() / 1000;
-
     handleWordTyped = (word) => {
         if (!word) {
             return true;
@@ -213,14 +218,17 @@ class App extends Component {
         this.setState({ currWord });
         if (this.state.typedWords.length + 1 === this.state.promptedWords.length
             && this.state.promptedWords[this.state.promptedWords.length - 1] === currWord
-        && (this.state.mode === Mode.SINGLE
+            && (this.state.mode === Mode.SINGLE
                 || this.state.typedWords.concat([currWord]).join(" ") === this.state.promptedWords.join(" "))) {
             clearInterval(this.timer);
             this.setState({ inputActive: false });
             this.handleWordTyped(currWord);
-            const threshold = await post("/wpm_threshold");
-            if (this.state.wpm >= threshold && parseFloat(this.state.accuracy) === 100) {
-                this.setState({ showUsernameEntry: true });
+            const token = Cookies.get("token") || null;
+            const { eligible, needVerify } = await post("/check_leaderboard_eligibility", {
+                user: Cookies.get("user"), wpm: this.state.wpm, token,
+            });
+            if (eligible && this.state.accuracy === 100) {
+                this.setState({ showUsernameEntry: true, needVerify });
             }
         } else if (!this.timer) {
             this.restart();
@@ -281,13 +289,12 @@ class App extends Component {
         this.setState({ topics }, this.initialize);
     };
 
-    handleUsernameSubmission = async (username) => {
+    handleUsernameSubmission = async (name) => {
         await post("/record_wpm", {
-            username,
+            name,
+            user: Cookies.get("user"),
             wpm: this.state.wpm,
-            confirm: "If you want to mess around, send requests"
-                + " to /record_meme! Leave this endpoint for legit submissions please. Don't be a"
-                + " jerk and ruin this for everyone, thanks!",
+            token: Cookies.get("token") || null,
         });
         this.hideUsernameEntry();
     };
@@ -384,8 +391,11 @@ class App extends Component {
                     show={this.state.showLeaderboard}
                     onHide={this.toggleLeaderBoard}
                 />
-                <NamePrompt
+                <HighScorePrompt
+                    key={this.state.showUsernameEntry}
+                    wpm={this.state.wpm}
                     show={this.state.showUsernameEntry}
+                    needVerify={this.state.needVerify}
                     onHide={this.hideUsernameEntry}
                     onSubmit={this.handleUsernameSubmission}
                 />
