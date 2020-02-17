@@ -55,7 +55,7 @@ def autocorrect(word=""):
     candidates = [w for w, s in LETTER_SETS if similar(s, letters, SIMILARITY_LIMIT)]
 
     # Try various diff functions until one doesn't raise an exception.
-    for fn in [cats.final_diff, cats.edit_diff, cats.swap_diff]:
+    for fn in [cats.final_diff, cats.feline_fixes, cats.sphinx_swap]:
         try:
             guess = cats.autocorrect(word, candidates, fn, SIMILARITY_LIMIT)
             return reformat(guess, raw_word)
@@ -103,13 +103,12 @@ def report_progress(id, typed, prompt):
 @route
 def fastest_words(prompt, targets):
     """Return a list of word_speed values describing the game."""
-    words = ["START"] + prompt.split()
+    words = prompt.split()
     progress = Server.request_all_progress(targets=targets)
     start_times = [p[0][1] for p in progress]
-    word_times = [[cats.word_time(w, p[1] - s) for w, p in zip(words, ps)]
-                  for s, ps in zip(start_times, progress)]
-
-    return cats.fastest_words(word_times)
+    times_per_player = [[p[1] - s for p in ps] for s, ps in zip(start_times, progress)]
+    game = cats.time_per_word(times_per_player, words)
+    return cats.fastest_words(game)
 
 
 multiplayer.create_multiplayer_server()

@@ -41,6 +41,7 @@ def create_multiplayer_server():
     @route
     @forward_to_server
     def request_id():
+        assert cats.enable_multiplayer
         return randrange(1000000000)
 
     @route
