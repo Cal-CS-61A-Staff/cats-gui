@@ -8,11 +8,12 @@ import { formatNum, getCurrTime, useInterval } from "./utils";
 
 export default function CaptchaChallenge({ images, onSubmit }) {
     const [typedWords, setTypedWords] = useState([]);
+    const [currWord, setCurrWord] = useState("");
     const [startTime] = useState(getCurrTime());
     const [wpm, setWPM] = useState(null);
     const [active, setActive] = useState(true);
 
-    const updateWPM = async () => {
+    const updateWPM = async (word) => {
         const text = typedWords.join(" ");
         const { wpm: newWPM } = await post("/analyze", {
             promptedText: text,
@@ -21,6 +22,7 @@ export default function CaptchaChallenge({ images, onSubmit }) {
             endTime: getCurrTime(),
         });
         setWPM(newWPM);
+        setCurrWord(word);
     };
 
     useInterval(updateWPM, 100);
@@ -29,12 +31,17 @@ export default function CaptchaChallenge({ images, onSubmit }) {
         if (word === "") {
             return true;
         }
+        setCurrWord("");
         setTypedWords(typedWords.concat([word]));
-        if (typedWords.length + 1 === images.length) {
+        if (typedWords.length + 2 === images.length) {
             onSubmit(typedWords);
             setActive(false);
         }
         return true;
+    };
+
+    const handleSubmit = () => {
+        onSubmit(typedWords.concat([currWord]));
     };
 
     const popPrevWord = () => {
@@ -64,7 +71,7 @@ export default function CaptchaChallenge({ images, onSubmit }) {
             />
             <br />
             <div className="form-group">
-                <button type="submit" className="btn btn-primary">Submit</button>
+                <button onClick={handleSubmit} type="submit" className="btn btn-primary">Submit</button>
                 <Indicator text={`WPM: ${formatNum(wpm)}`} />
             </div>
         </div>

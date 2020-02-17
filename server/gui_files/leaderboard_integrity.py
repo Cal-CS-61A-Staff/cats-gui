@@ -13,7 +13,7 @@ fernet = None
 
 COMMON_WORDS_SET = set(typing_test.lines_from_file('data/common_words.txt'))
 CAPTCHA_QUEUE_LEN = 200
-CAPTCHA_LENGTH = 20
+CAPTCHA_LENGTH = 10
 CAPTCHA_WORD_LEN = 6
 
 captcha_queue = Queue()

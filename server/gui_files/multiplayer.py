@@ -160,7 +160,7 @@ def create_multiplayer_server():
         if user != challenge_user:
             return
 
-        accuracy = typing_test.accuracy(" ".join(typed), " ".join(reference))
+        accuracy = typing_test.accuracy(" ".join(typed[:-1]), " ".join(reference[:-1]))
         wpm = typing_test.wpm(" ".join(reference), end_time - start_time)
 
         if wpm < claimed_wpm * CAPTCHA_SLOWDOWN_FACTOR:
