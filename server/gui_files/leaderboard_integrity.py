@@ -7,11 +7,11 @@ from functools import wraps
 from queue import Queue
 from threading import Thread
 
-import typing_test
+import cats
 
 fernet = None
 
-COMMON_WORDS_SET = set(typing_test.lines_from_file('data/common_words.txt'))
+COMMON_WORDS_SET = set(cats.lines_from_file('data/common_words.txt'))
 CAPTCHA_QUEUE_LEN = 200
 CAPTCHA_LENGTH = 10
 CAPTCHA_WORD_LEN = 6
@@ -109,6 +109,3 @@ def get_captcha_urls(num_words=CAPTCHA_LENGTH):
         words.append(word)
 
     return images, words
-
-
-Thread(target=populate_captcha_queue).start()

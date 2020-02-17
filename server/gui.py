@@ -4,7 +4,7 @@ import os
 import random
 import string
 
-import typing_test
+import cats
 from gui_files.common_server import Server, route, sendto, start
 from gui_files import multiplayer
 
@@ -12,7 +12,7 @@ PORT = 31415
 DEFAULT_SERVER = 'https://cats.cs61a.org'
 GUI_FOLDER = "gui_files/"
 PARAGRAPH_PATH = "./data/sample_paragraphs.txt"
-WORDS_LIST = typing_test.lines_from_file('data/words.txt')
+WORDS_LIST = cats.lines_from_file('data/words.txt')
 WORDS_SET = set(WORDS_LIST)
 LETTER_SETS = [(w, set(w)) for w in WORDS_LIST]
 SIMILARITY_LIMIT = 2
@@ -21,18 +21,18 @@ SIMILARITY_LIMIT = 2
 @route
 def request_paragraph(topics=None):
     """Return a random paragraph."""
-    paragraphs = typing_test.lines_from_file(PARAGRAPH_PATH)
+    paragraphs = cats.lines_from_file(PARAGRAPH_PATH)
     random.shuffle(paragraphs)
-    select = typing_test.about(topics) if topics else lambda x: True
-    return typing_test.choose(paragraphs, select, 0)
+    select = cats.about(topics) if topics else lambda x: True
+    return cats.choose(paragraphs, select, 0)
 
 
 @route
 def analyze(prompted_text, typed_text, start_time, end_time):
     """Return [wpm, accuracy]."""
     return {
-        "wpm": typing_test.wpm(typed_text, end_time - start_time),
-        "accuracy": typing_test.accuracy(typed_text, prompted_text)
+        "wpm": cats.wpm(typed_text, end_time - start_time),
+        "accuracy": cats.accuracy(typed_text, prompted_text)
     }
 
 
@@ -46,7 +46,7 @@ def similar(w, v, n):
 def autocorrect(word=""):
     """Call autocorrect using the best score function available."""
     raw_word = word
-    word = typing_test.lower(typing_test.remove_punctuation(raw_word))
+    word = cats.lower(cats.remove_punctuation(raw_word))
     if word in WORDS_SET or word == '':
         return raw_word
 
@@ -55,9 +55,9 @@ def autocorrect(word=""):
     candidates = [w for w, s in LETTER_SETS if similar(s, letters, SIMILARITY_LIMIT)]
 
     # Try various diff functions until one doesn't raise an exception.
-    for fn in [typing_test.final_diff, typing_test.edit_diff, typing_test.swap_diff]:
+    for fn in [cats.final_diff, cats.edit_diff, cats.swap_diff]:
         try:
-            guess = typing_test.autocorrect(word, candidates, fn, SIMILARITY_LIMIT)
+            guess = cats.autocorrect(word, candidates, fn, SIMILARITY_LIMIT)
             return reformat(guess, raw_word)
         except BaseException:
             pass
@@ -97,7 +97,7 @@ def report_progress(id, typed, prompt):
     typed = typed.split()  # A list of word strings
     prompt = prompt.split()  # A list of word strings
 
-    return typing_test.report_progress(typed, prompt, id, sendto(Server.set_progress))
+    return cats.report_progress(typed, prompt, id, sendto(Server.set_progress))
 
 
 @route
@@ -106,10 +106,10 @@ def fastest_words(prompt, targets):
     words = ["START"] + prompt.split()
     progress = Server.request_all_progress(targets=targets)
     start_times = [p[0][1] for p in progress]
-    word_times = [[typing_test.word_time(w, p[1] - s) for w, p in zip(words, ps)]
+    word_times = [[cats.word_time(w, p[1] - s) for w, p in zip(words, ps)]
                   for s, ps in zip(start_times, progress)]
 
-    return typing_test.fastest_words(word_times)
+    return cats.fastest_words(word_times)
 
 
 multiplayer.create_multiplayer_server()

@@ -3,7 +3,7 @@ from collections import namedtuple, defaultdict
 from datetime import datetime, timedelta
 from random import randrange
 
-import typing_test
+import cats
 from gui_files.common_server import route, forward_to_server, server_only
 from gui_files.db import connect_db, setup_db
 from gui_files.leaderboard_integrity import get_authorized_limit, get_captcha_urls, encode_challenge, decode_challenge, \
@@ -17,8 +17,8 @@ MAX_WAIT = timedelta(seconds=5)
 MAX_NAME_LENGTH = 30
 
 MAX_UNVERIFIED_WPM = 90
-CAPTCHA_ACCURACY_THRESHOLD = 70
-CAPTCHA_SLOWDOWN_FACTOR = 0.7
+CAPTCHA_ACCURACY_THRESHOLD = 60
+CAPTCHA_SLOWDOWN_FACTOR = 0.6
 
 
 def db_init():
@@ -160,8 +160,8 @@ def create_multiplayer_server():
         if user != challenge_user:
             return
 
-        accuracy = typing_test.accuracy(" ".join(typed[:-1]), " ".join(reference[:-1]))
-        wpm = typing_test.wpm(" ".join(reference), end_time - start_time)
+        accuracy = cats.accuracy(" ".join(typed[:-1]), " ".join(reference[:-1]))
+        wpm = cats.wpm(" ".join(reference), end_time - start_time)
 
         if wpm < claimed_wpm * CAPTCHA_SLOWDOWN_FACTOR:
             # too slow!
