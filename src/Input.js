@@ -114,7 +114,7 @@ class InputField extends Component {
                 contentEditable={this.props.active}
                 onInput={this.handleInput}
                 onKeyDown={this.handleKeyDown}
-                onPaste={e => e.preventDefault()}
+                onPaste={(e) => e.preventDefault()}
             />
         );
     }

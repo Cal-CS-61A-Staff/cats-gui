@@ -2,3 +2,5 @@ Flask
 gunicorn
 SQLAlchemy
 mysqlclient
+cryptography
+claptcha
