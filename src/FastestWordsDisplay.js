@@ -4,7 +4,7 @@ import Row from "react-bootstrap/Row";
 import Table from "react-bootstrap/Table";
 
 export default function FastestWordsDisplay({ fastestWords, playerIndex }) {
-    return (
+    return fastestWords.length > 0 && (
         <>
             <h4>Fastest words typed by each player</h4>
             <Row>
