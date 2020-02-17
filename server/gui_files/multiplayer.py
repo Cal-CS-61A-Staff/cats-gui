@@ -74,7 +74,7 @@ def create_multiplayer_server():
             # start game!
             import gui
             curr_text = gui.request_paragraph()
-            game_id = request_id()
+            game_id = gui.request_id()
 
             for player in State.queue:
                 State.game_lookup[player] = game_id
