@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom";
 import "./index.css";
 import App from "./App";
+import post from "./post";
 import * as serviceWorker from "./serviceWorker";
 
 document.body.prepend(new Comment(String.raw`
@@ -29,6 +30,10 @@ document.body.prepend(new Comment(String.raw`
            | |\ \       || )
           (_/ (_/      ((_/
 `));
+
+post("/favicon").then((image) => {
+    document.querySelector("link[rel=\"shortcut icon\"]").href = image;
+});
 
 ReactDOM.render(<App />, document.getElementById("root"));
 
