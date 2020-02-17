@@ -1,24 +1,16 @@
 """Web server for the typing GUI."""
 
-import argparse
-import json
-import socketserver
-import ssl
+import os
+import random
 import string
-import traceback
-import webbrowser
-
-from http import server, HTTPStatus
-from http.server import HTTPServer
-from random import randrange
-from ucb import main
-from urllib.request import Request, urlopen
-from urllib.parse import urlencode, unquote, parse_qs
 
 import typing_test
+from gui_files.common_server import Server, route, sendto, start
+from gui_files import multiplayer_server
 
 PORT = 31415
 DEFAULT_SERVER = 'https://cats.cs61a.org'
+GUI_FOLDER = "gui_files/"
 PARAGRAPH_PATH = "./data/sample_paragraphs.txt"
 WORDS_LIST = typing_test.lines_from_file('data/words.txt')
 WORDS_SET = set(WORDS_LIST)
@@ -27,74 +19,22 @@ LIMIT = 2
 PATHS = {}
 
 
-def route(path):
-    """Register a route handler."""
-    def wrap(f):
-        PATHS[path] = f
-        return f
-    return wrap
-
-
-class Handler(server.BaseHTTPRequestHandler):
-    """HTTP handler."""
-    def do_GET(self):
-        self.send_response(HTTPStatus.OK)
-        path = "gui/" + unquote(self.path)[1:]
-        if "scripts" in path and not path.endswith(".js"):
-            path += ".js"
-
-        if path.endswith(".css"):
-            self.send_header("Content-type", "text/css")
-        elif path.endswith(".js"):
-            self.send_header("Content-type", "application/javascript")
-        self.end_headers()
-        if path == "gui/":
-            path = "gui/index.html"
-        try:
-            with open(path, "rb") as f:  # lol better make sure that port is closed
-                self.wfile.write(f.read())
-        except Exception as e:
-            print(e)
-            # raise
-
-    def do_POST(self):
-        content_length = int(self.headers["Content-Length"])
-        raw_data = self.rfile.read(content_length)
-        data = parse_qs(raw_data.decode("ascii"))
-        path = unquote(self.path)
-
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-type", "application/json")
-        self.end_headers()
-
-        try:
-            result = PATHS[path](data)
-            self.wfile.write(bytes(json.dumps(result), "utf-8"))
-        except Exception as e:
-            print(e)
-            raise
-
-    def log_message(self, *args, **kwargs):
-        pass
-
-
-@route("/request_paragraph")
-def request_paragraph(data):
+@route
+def request_paragraph(topics=None):
     """Return a random paragraph."""
     paragraphs = typing_test.lines_from_file(PARAGRAPH_PATH)
-    paragraph_index = randrange(len(paragraphs))
-    return typing_test.choose(paragraphs, lambda x: True, paragraph_index)
+    random.shuffle(paragraphs)
+    select = typing_test.about(topics) if topics else lambda x: True
+    return typing_test.choose(paragraphs, select, 0)
 
 
-@route("/analyze")
-def compute_accuracy(data):
+@route
+def analyze(prompted_text, typed_text, start_time, end_time):
     """Return [wpm, accuracy]."""
-    prompted_text = data["promptedText"][0]
-    typed_text = data.get("typedText", [""])[0]
-    start_time = float(data["startTime"][0])
-    end_time = float(data["endTime"][0])
-    return [typing_test.wpm(typed_text, end_time - start_time),
-            typing_test.accuracy(typed_text, prompted_text)]
+    return {
+        "wpm": typing_test.wpm(typed_text, end_time - start_time),
+        "accuracy": typing_test.accuracy(typed_text, prompted_text)
+    }
 
 
 def similar(w, v, n):
@@ -103,10 +43,10 @@ def similar(w, v, n):
     return intersect >= len(w) - n and intersect >= len(v) - n
 
 
-@route("/autocorrect")
-def autocorrect(data):
+@route
+def autocorrect(word=""):
     """Call autocorrect using the best score function available."""
-    raw_word = data.get("word", [""])[0]
+    raw_word = word
     word = typing_test.lower(typing_test.remove_punctuation(raw_word))
     if word in WORDS_SET or word == '':
         return raw_word
@@ -120,7 +60,7 @@ def autocorrect(data):
         try:
             guess = typing_test.autocorrect(word, candidates, fn, LIMIT)
             return reformat(guess, raw_word)
-        except BaseException as e:
+        except BaseException:
             pass
 
     return raw_word
@@ -152,79 +92,29 @@ def reformat(word, raw_word):
 # Multiplayer #
 ###############
 
-
-def multiplayer_post(path, data, server_url=DEFAULT_SERVER):
-    """Post DATA to a multiplayer server PATH and return the response."""
-    data_bytes = bytes(urlencode(data, True), encoding='utf-8')
-    request = Request(server_url + path, data_bytes, method='POST')
-    try:
-        response = urlopen(request, context=ssl._create_unverified_context())
-        text = response.read().decode('utf-8')
-        if text.strip():
-            return json.loads(text)
-    except Exception as e:
-        traceback.print_exc()
-        print(e)
-        return None
-
-
-def multiplayer_route(path, server_path=None):
-    """Convert a function that takes (data, send) into a route."""
-    if not server_path:
-        server_path = path
-    def wrap(f):
-        def send(data):
-            return multiplayer_post(server_path, data)
-        def routed_fn(data):
-            assert typing_test.enable_multiplayer, 'Multiplayer not implemented; single player only for now'
-            response = f(data, send)
-            return response
-        route(path)(routed_fn)
-        return f
-    return wrap
-
-
-def forward_to_server(data, send):
-    """Forward a request to the multiplayer server."""
-    return send(data)
-
-
-multiplayer_route("/request_id")(forward_to_server)
-multiplayer_route('/request_match')(forward_to_server)
-multiplayer_route('/request_progress')(forward_to_server)
-
-
-@multiplayer_route('/report_progress', '/set_progress')
-def report_progress(data, send):
+@route
+def report_progress(id, typed, prompt):
     """Report progress to the multiplayer server and also return it."""
-    typed = data.get("typed", [""])[0].split()   # A list of word strings
-    prompt = data.get("prompt", [""])[0].split() # A list of word strings
-    id = data["id"][0]
-    return typing_test.report_progress(typed, prompt, id, send)
+    typed = typed.split()  # A list of word strings
+    prompt = prompt.split()  # A list of word strings
+
+    return typing_test.report_progress(typed, prompt, id, sendto(Server.set_progress))
 
 
-@multiplayer_route('/fastest_words', '/request_all_progress')
-def fastest_words(data, send):
+@route
+def fastest_words(prompt, targets):
     """Return a list of word_speed values describing the game."""
-    words = ["START"] + data.get("prompt", [""])[0].split()
-    del data["prompt"]
-    progress = send(data)
+    words = ["START"] + prompt.split()
+    progress = Server.request_all_progress(targets=targets)
     start_times = [p[0][1] for p in progress]
-    word_times = [[typing_test.word_time(w, p[1] - s) for w, p in zip(words, ps)] \
+    word_times = [[typing_test.word_time(w, p[1] - s) for w, p in zip(words, ps)]
                   for s, ps in zip(start_times, progress)]
 
-    return typing_test.fastest_words_report(word_times)
+    return typing_test.fastest_words(word_times)
 
 
-@main
-def start(*args):
-    """Start web server."""
-    parser = argparse.ArgumentParser(description="Cats GUI Server")
-    parser.add_argument('-s', help="Stand-alone: do not open browser", action='store_true')
-    args = parser.parse_args()
+multiplayer_server.create_multiplayer_server()
 
-    socketserver.TCPServer.allow_reuse_address = True
-    httpd = HTTPServer(("localhost", PORT), Handler)
-    if not args.s:
-        webbrowser.open("http://localhost:" + str(PORT), new=0, autoraise=True)
-    httpd.serve_forever()
+
+if __name__ == "__main__" or "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
+    app = start(PORT, DEFAULT_SERVER, GUI_FOLDER, multiplayer_server.db_init)
