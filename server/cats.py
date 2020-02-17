@@ -78,7 +78,7 @@ def autocorrect(user_word, valid_words, diff_function, limit):
     # END PROBLEM 5
 
 
-def swap_diff(start, goal, limit):
+def sphinx_swap(start, goal, limit):
     """A diff function for autocorrect that determines how many letters
     in START need to be substituted to create GOAL, then adds the difference in
     their lengths.
@@ -87,7 +87,7 @@ def swap_diff(start, goal, limit):
     assert False, 'Remove this line'
     # END PROBLEM 6
 
-def edit_diff(start, goal, limit):
+def feline_fixes(start, goal, limit):
     """A diff function that computes the edit distance from START to GOAL."""
     assert False, 'Remove this line'
 
@@ -129,41 +129,68 @@ def report_progress(typed, prompt, id, send):
     # END PROBLEM 8
 
 
-def fastest_words_report(word_times):
+def fastest_words_report(times_per_player, words):
     """Return a text description of the fastest words typed by each player."""
-    fastest = fastest_words(word_times)
+    game = time_per_word(times_per_player, words)
+    fastest = fastest_words(game)
     report = ''
     for i in range(len(fastest)):
         words = ','.join(fastest[i])
         report += 'Player {} typed these fastest: {}\n'.format(i + 1, words)
     return report
 
-
-def fastest_words(word_times, margin=1e-5):
-    """A list of which words each player typed fastest."""
-    n_players = len(word_times)
-    n_words = len(word_times[0]) - 1
-    assert all(len(times) == n_words + 1 for times in word_times)
-    assert margin > 0
+def time_per_word(times_per_player, words):
+    """Given timing data, return a game ADT, which contains a list of words
+    and the amount of time each player took to type each word.
+    Arguments:
+        times_per_player: A list of lists of timestamps including the time you start typing,
+                          followed by the time you finished typing each word
+        words: a list of words, in the order they are typed
+    """
     # BEGIN PROBLEM 9
     "*** YOUR CODE HERE ***"
     # END PROBLEM 9
+def fastest_words(game):
+    """
+    A list of lists of which words each player typed fastest.
+    Arguments:
+        game: a game ADT as returned by Problem 9
+    Returns:
+        a list of lists containing which words each player typed fastest
+    """
+    num_players = len(all_times(game))
+    num_words = len(all_words(game))
+    assert all(len(times) == num_words for times in all_times(game))
+    # BEGIN PROBLEM 10
+    "*** YOUR CODE HERE ***"
+    # END PROBLEM 10
 
+def game(words, times):
+    """A data abstraction containing all words typed"""
+    return [words, times]
 
-def word_time(word, elapsed_time):
-    """A data abstrction for the elapsed time that a player finished a word."""
-    return [word, elapsed_time]
+def word_at(game, word_index):
+    """A selector function that gets the word with index word_index"""
+    assert word_index < len(game[0]), "word_index out of range of words!"
+    return game[0][word_index]
 
+def all_words(game):
+    """A selector function for all the words in the game"""
+    return game[0]
 
-def word(word_time):
-    """An accessor function for the word of a word_time."""
-    return word_time[0]
+def all_times(game):
+    """A selector function for all typing times for all players"""
+    return game[1]
 
+def time(game, player_num, word_index):
+    """A selector function for the time it took player_num to type the word at word_index"""
+    assert word_index < len(game[0]), "word_index out of range of words!"
+    assert player_num < len(game[1]), "player_num out of range of players!"
+    return game[1][player_num][word_index]
 
-def elapsed_time(word_time):
-    """An accessor function for the elapsed time of a word_time."""
-    return word_time[1]
-
+def stringify(game):
+    """A helper function that takes in a game object and returns a string representation of it"""
+    return "game(%s, %s)" % (game[0], game[1])
 
 enable_multiplayer = False  # Change to True when you
 
