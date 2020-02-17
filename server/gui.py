@@ -1,5 +1,5 @@
 """Web server for the typing GUI."""
-
+import base64
 import os
 import random
 import string
@@ -114,6 +114,21 @@ def fastest_words(prompt, targets):
 
 
 multiplayer_server.create_multiplayer_server()
+
+###############
+# Favicons #
+###############
+
+
+@route
+def favicon():
+    favicon_folder = os.path.join(GUI_FOLDER, "favicons")
+    favicons = os.listdir(favicon_folder)
+    path = os.path.join(favicon_folder, random.choice(favicons))
+    with open(path, "rb") as f:
+        data = f.read()
+    image_b64 = base64.b64encode(data).decode("utf-8")
+    return "data:image/png;base64," + image_b64
 
 
 if __name__ == "__main__" or "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
