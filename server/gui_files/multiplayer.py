@@ -128,7 +128,9 @@ def create_multiplayer_server():
     @forward_to_server
     def check_on_leaderboard(user):
         with connect_db() as db:
-            ret = db("SELECT * FROM leaderboard WHERE user_id=(%s)", [user]).fetchone()
+            vals = db("SELECT wpm FROM leaderboard ORDER BY wpm DESC LIMIT 20").fetchall()
+            threshold = vals[-1][0] if len(vals) >= 20 else 0
+            ret = db("SELECT * FROM leaderboard WHERE user_id=(%s) AND wpm >= (%s)", [user, threshold]).fetchone()
         return bool(ret)
 
     @route
