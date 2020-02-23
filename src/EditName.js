@@ -20,7 +20,7 @@ export default function EditName({ onNameChange }) {
 
     return display && (
         <Modal.Footer>
-            <Form onSubmit={(e) => { e.preventDefault(); onNameChange(name); }} style={{ width: "100%" }}>
+            <Form onSubmit={(e) => { e.preventDefault(); setName(""); onNameChange(name); }} style={{ width: "100%" }}>
                 <Form.Row>
                     <Col>
                         <Form.Control placeholder="Change leaderboard name" value={name} onChange={handleChange} />
