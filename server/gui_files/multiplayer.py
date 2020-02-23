@@ -126,6 +126,21 @@ def create_multiplayer_server():
 
     @route
     @forward_to_server
+    def check_on_leaderboard(user):
+        with connect_db() as db:
+            users = list(x[0] for x in db("SELECT user_id FROM leaderboard ORDER BY wpm DESC LIMIT 20").fetchall())
+        return bool(user in users)
+
+    @route
+    @forward_to_server
+    def update_name(new_name, user):
+        if len(new_name) > MAX_NAME_LENGTH:
+            return
+        with connect_db() as db:
+            db("UPDATE leaderboard SET name=(%s) WHERE user_id=(%s)", [new_name, user])
+
+    @route
+    @forward_to_server
     def check_leaderboard_eligibility(wpm, user, token):
         with connect_db() as db:
             vals = db("SELECT wpm FROM leaderboard ORDER BY wpm DESC LIMIT 20").fetchall()
